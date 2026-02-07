@@ -1,0 +1,22 @@
+{
+  "name": "awesome-palette-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Awesome Copilot Palette — A configurable catalog and installer for GitHub Copilot instructions, prompts, and chatmodes",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "build:core": "npm run build -w packages/core",
+    "build:vscode": "npm run build -w packages/vscode",
+    "build:cli": "npm run build -w packages/cli",
+    "check-types": "npm run check-types --workspaces",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "clean": "npm run clean --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

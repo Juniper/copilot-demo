@@ -1,0 +1,114 @@
+{
+  "name": "awesome-palette-vscode",
+  "displayName": "Awesome Copilot Palette",
+  "description": "Browse and install GitHub Copilot instructions, prompts, and chatmodes from awesome-copilot repositories",
+  "version": "0.1.0",
+  "publisher": "awesome-palette",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "check-types": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "@awesome-palette/core": "0.1.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.0"
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "awesome-palette",
+          "title": "Awesome Copilot Palette",
+          "icon": "$(library)"
+        }
+      ]
+    },
+    "views": {
+      "awesome-palette": [
+        {
+          "id": "awesome-palette.catalog",
+          "name": "Catalog",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "awesome-palette.openCatalog",
+        "title": "Open Copilot Catalog",
+        "category": "Awesome Palette",
+        "icon": "$(library)"
+      },
+      {
+        "command": "awesome-palette.refreshCatalog",
+        "title": "Refresh Catalog",
+        "category": "Awesome Palette",
+        "icon": "$(refresh)"
+      }
+    ],
+    "configuration": {
+      "title": "Awesome Copilot Palette",
+      "properties": {
+        "awesome-palette.remoteRepositories": {
+          "type": "array",
+          "default": [
+            {
+              "owner": "HPE-EMU",
+              "repo": "awesome-copilot",
+              "branch": "main",
+              "enabled": true
+            }
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "owner": { "type": "string" },
+              "repo": { "type": "string" },
+              "branch": { "type": "string", "default": "main" },
+              "enabled": { "type": "boolean", "default": true }
+            },
+            "required": ["owner", "repo"]
+          },
+          "description": "List of awesome-copilot GitHub repositories to fetch files from"
+        },
+        "awesome-palette.enableOnlineFetching": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable fetching files from remote repositories"
+        },
+        "awesome-palette.githubToken": {
+          "type": "string",
+          "default": "",
+          "description": "GitHub personal access token for higher API rate limits (optional)"
+        },
+        "awesome-palette.cache.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable catalog caching"
+        },
+        "awesome-palette.cache.onlineTtlMs": {
+          "type": "number",
+          "default": 10800000,
+          "description": "Online catalog cache TTL in milliseconds (default: 3 hours)"
+        },
+        "awesome-palette.cache.enhancedTtlMs": {
+          "type": "number",
+          "default": 1800000,
+          "description": "Enhanced catalog cache TTL in milliseconds (default: 30 minutes)"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@awesome-palette/core",
+  "version": "0.1.0",
+  "description": "Core library for Awesome Copilot Palette — catalog, repository, and installer for GitHub Copilot customizations",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "assets"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "check-types": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "test": "node --test dist/**/*.test.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "license": "MIT"
+}
