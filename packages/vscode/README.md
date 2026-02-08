@@ -15,6 +15,20 @@ Awesome Copilot Palette provides a curated catalog of GitHub Copilot customizati
 - **Installation Status** — See which catalog files are already installed in your current workspace
 - **Conflict Resolution** — Handle file conflicts during installation (overwrite, skip, or rename)
 
+## Screenshots
+
+### Sidebar View
+
+The sidebar provides quick access to catalog statistics, installation status, and workspace connection information:
+
+![Sidebar View](../../docs/screenshots/sidebar-view.png)
+
+### Full Catalog Browser
+
+The full catalog view displays all available instructions, prompts, agents, skills, and cookbooks in a searchable table:
+
+![Catalog View](../../docs/screenshots/catalog-view.png)
+
 ## Quick Start
 
 1. Open the Awesome Copilot Palette view from the Activity Bar (look for the wand icon)
