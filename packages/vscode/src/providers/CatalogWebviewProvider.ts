@@ -20,7 +20,7 @@ import { CatalogTemplate, CatalogTemplateData } from '../templates/CatalogTempla
 
 export interface CatalogFilter {
 	type?: 'all' | 'installed' | 'available' | 'recommended';
-	fileTypes?: ('instruction' | 'prompt' | 'chatmode')[];
+	fileTypes?: ('instruction' | 'prompt' | 'agent' | 'skill' | 'cookbook')[];
 	sources?: ('Bundled' | 'Online')[];
 	recommendedFiles?: string[];
 }
@@ -45,7 +45,7 @@ export class CatalogWebviewProvider implements IWebviewProvider {
 	}
 
 	/**
-	 * Show the catalog webview
+	 * Show the catalog webview. Reuses existing panel if available.
 	 */
 	public async show(filter?: CatalogFilter): Promise<void> {
 		try {
@@ -58,7 +58,25 @@ export class CatalogWebviewProvider implements IWebviewProvider {
 			// Apply filter to catalog data
 			const filteredData = this._applyFilter(catalogData, filter);
 
-			// Create and show catalog webview in a separate editor column
+			// Check if panel already exists and is visible
+			if (this._panel) {
+				this._logger.info('Reusing existing catalog panel');
+
+				// Update panel title
+				this._panel.title = this._getTitleForFilter(filterType);
+
+				// Update content
+				this._panel.webview.html = await this._getCatalogHtml(filteredData, filter);
+
+				// Reveal the panel (bring to front)
+				this._panel.reveal(vscode.ViewColumn.Beside);
+
+				this._logger.info(`Catalog refreshed with ${filteredData.length} files (filtered from ${catalogData.length})`);
+				return;
+			}
+
+			// Create new panel if none exists
+			this._logger.info('Creating new catalog panel');
 			this._panel = vscode.window.createWebviewPanel(
 				'awesomePaletteCatalog',
 				this._getTitleForFilter(filterType),
@@ -94,6 +112,7 @@ export class CatalogWebviewProvider implements IWebviewProvider {
 
 			// Handle panel disposal
 			this._panel.onDidDispose(() => {
+				this._logger.info('Catalog panel disposed');
 				this._panel = undefined;
 			});
 
@@ -101,7 +120,9 @@ export class CatalogWebviewProvider implements IWebviewProvider {
 
 		} catch (error) {
 			this._logger.error('Failed to show catalog', error);
-			vscode.window.showErrorMessage(`Failed to show catalog: ${error}`);
+			vscode.window.showErrorMessage(
+				`Failed to display catalog: ${error instanceof Error ? error.message : String(error)}`
+			);
 		}
 	}
 
@@ -187,18 +208,53 @@ export class CatalogWebviewProvider implements IWebviewProvider {
 					}
 				}
 
-				// Add remote chatmodes
-				for (const chatmode of enhancedCatalog.combined.chatmodes) {
-					if (!chatmode.includes('(remote)')) { continue; }
-					const name = chatmode.split(' - ')[0].split('/').pop()?.replace('.chatmode.md', '') || chatmode;
-					const fileKey = `chatmode-${name}`;
+				// Add remote agents
+				for (const agent of enhancedCatalog.combined.agents) {
+					if (!agent.includes('(remote)')) { continue; }
+					const name = agent.split(' - ')[0].split('/').pop()?.replace('.agent.md', '') || agent;
+					const fileKey = `agent-${name}`;
 					if (!addedFiles.has(fileKey)) {
 						catalogData.push({
 							name,
-							type: 'chatmode',
+							type: 'agent',
 							source: 'Online',
-							path: `catalog/chatmodes/${name}`,
-							description: chatmode.split(' - ')[1]?.replace(' (remote)', '') || 'From online catalog'
+							path: `catalog/agents/${name}`,
+							description: agent.split(' - ')[1]?.replace(' (remote)', '') || 'From online catalog'
+						});
+						addedFiles.add(fileKey);
+					}
+				}
+
+				// Add remote skills (folder-based) - use full RemoteFile data
+				for (const remoteSkill of enhancedCatalog.remote.skills || []) {
+					const fileKey = `skill-${remoteSkill.name}`;
+					if (!addedFiles.has(fileKey)) {
+						catalogData.push({
+							name: remoteSkill.name,
+							type: 'skill',
+							source: 'Online',
+							path: remoteSkill.path,
+							description: `${remoteSkill.name} from ${remoteSkill.repository.name}`,
+							// Include folder metadata for installation
+							isFolder: remoteSkill.isFolder,
+							files: remoteSkill.files
+						});
+						addedFiles.add(fileKey);
+					}
+				}
+
+				// Add remote cookbooks
+				for (const cookbook of enhancedCatalog.combined.cookbooks || []) {
+					if (!cookbook.includes('(remote)')) { continue; }
+					const name = cookbook.split(' - ')[0].split('/').pop()?.replace('.cookbook.md', '') || cookbook;
+					const fileKey = `cookbook-${name}`;
+					if (!addedFiles.has(fileKey)) {
+						catalogData.push({
+							name,
+							type: 'cookbook',
+							source: 'Online',
+							path: `catalog/cookbooks/${name}`,
+							description: cookbook.split(' - ')[1]?.replace(' (remote)', '') || 'From online catalog'
 						});
 						addedFiles.add(fileKey);
 					}
@@ -220,27 +276,12 @@ export class CatalogWebviewProvider implements IWebviewProvider {
 	 * Convert a CatalogEntry to an InstallableFile.
 	 */
 	private _catalogEntryToInstallableFile(entry: CatalogEntry, source: 'Bundled' | 'Online'): InstallableFile {
-		// Determine asset path based on type
-		let assetPath: string;
-		switch (entry.type) {
-			case 'instruction':
-				assetPath = `instructions/${entry.filePath}`;
-				break;
-			case 'prompt':
-				assetPath = `prompts/${entry.filePath}`;
-				break;
-			case 'chatmode':
-				assetPath = `chatmodes/${entry.filePath}`;
-				break;
-			default:
-				assetPath = entry.filePath;
-		}
-
+		// Use filePath directly - it already contains the full path (e.g., 'agents/Code.agent.md')
 		return {
-			name: entry.filePath.replace(/\.(instructions|prompt|chatmode)\.md$/, ''),
-			type: entry.type as 'instruction' | 'prompt' | 'chatmode',
+			name: entry.filePath.replace(/\.(instructions|prompt|agent|skill|cookbook)\.md$/, ''),
+			type: entry.type as 'instruction' | 'prompt' | 'agent' | 'skill' | 'cookbook',
 			source,
-			path: assetPath,
+			path: entry.filePath,
 			description: entry.description
 		};
 	}

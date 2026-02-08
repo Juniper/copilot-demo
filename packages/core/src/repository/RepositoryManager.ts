@@ -57,7 +57,9 @@ export class RepositoryManager {
 				branch: repoConfig.branch || 'main',
 				instructionsPath: 'instructions',
 				promptsPath: 'prompts',
-				chatmodesPath: 'chatmodes',
+				agentsPath: 'agents',
+				skillsPath: 'skills',
+				cookbooksPath: 'cookbook',
 				enabled: true
 			};
 
@@ -141,7 +143,9 @@ export class RepositoryManager {
 			const directories = [
 				{ path: repository.instructionsPath || 'instructions', type: 'instruction' as const },
 				{ path: repository.promptsPath || 'prompts', type: 'prompt' as const },
-				{ path: repository.chatmodesPath || 'chatmodes', type: 'chatmode' as const }
+				{ path: repository.agentsPath || 'agents', type: 'agent' as const },
+				{ path: repository.skillsPath || 'skills', type: 'skill' as const },
+				{ path: repository.cookbooksPath || 'cookbooks', type: 'cookbook' as const }
 			];
 
 			for (const dir of directories) {
@@ -160,7 +164,9 @@ export class RepositoryManager {
 					totalFiles: files.length,
 					instructionFiles: files.filter(f => f.type === 'instruction').length,
 					promptFiles: files.filter(f => f.type === 'prompt').length,
-					chatmodeFiles: files.filter(f => f.type === 'chatmode').length
+					agentFiles: files.filter(f => f.type === 'agent').length,
+					skillFiles: files.filter(f => f.type === 'skill').length,
+					cookbookFiles: files.filter(f => f.type === 'cookbook').length
 				}
 			};
 
@@ -175,7 +181,7 @@ export class RepositoryManager {
 			const failedIndex: RepositoryIndex = {
 				repository, files: [], indexedAt: new Date(),
 				ttl: this.config.indexRefreshInterval, isValid: false,
-				stats: { totalFiles: 0, instructionFiles: 0, promptFiles: 0, chatmodeFiles: 0 }
+				stats: { totalFiles: 0, instructionFiles: 0, promptFiles: 0, agentFiles: 0, skillFiles: 0, cookbookFiles: 0 }
 			};
 			this.indexes.set(repoKey, failedIndex);
 			return failedIndex;
@@ -185,7 +191,7 @@ export class RepositoryManager {
 	private async indexDirectory(
 		repository: OnlineRepository,
 		directoryPath: string,
-		fileType: 'instruction' | 'prompt' | 'chatmode'
+		fileType: 'instruction' | 'prompt' | 'agent' | 'skill' | 'cookbook'
 	): Promise<RemoteFile[]> {
 		this._logger.debug(`Indexing directory: ${directoryPath}/ in ${repository.name}`);
 
@@ -200,23 +206,37 @@ export class RepositoryManager {
 
 			const files: RemoteFile[] = [];
 
-			for (const item of response.data) {
-				if (item.type !== 'file') continue;
-				if (!this.isValidFileForType(item.name, fileType)) continue;
+			// Skills are folder-based, other types are file-based
+			if (fileType === 'skill') {
+				// For skills, look for directories and fetch their contents
+				for (const item of response.data) {
+					if (item.type !== 'dir') continue;
 
-				files.push({
-					name: item.name,
-					path: item.path,
-					type: fileType,
-					sha: item.sha,
-					size: item.size,
-					downloadUrl: item.download_url,
-					repository,
-					lastIndexed: new Date()
-				});
+					const skillFiles = await this.indexSkillFolder(repository, item.path, item.name);
+					if (skillFiles) {
+						files.push(skillFiles);
+					}
+				}
+			} else {
+				// For other types, just look for files
+				for (const item of response.data) {
+					if (item.type !== 'file') continue;
+					if (!this.isValidFileForType(item.name, fileType)) continue;
+
+					files.push({
+						name: item.name,
+						path: item.path,
+						type: fileType,
+						sha: item.sha,
+						size: item.size,
+						downloadUrl: item.download_url,
+						repository,
+						lastIndexed: new Date()
+					});
+				}
 			}
 
-			this._logger.debug(`Directory ${directoryPath}/ indexed: ${files.length} valid files`);
+			this._logger.debug(`Directory ${directoryPath}/ indexed: ${files.length} valid ${fileType} items`);
 			return files;
 
 		} catch (error) {
@@ -225,15 +245,106 @@ export class RepositoryManager {
 		}
 	}
 
-	private isValidFileForType(fileName: string, fileType: 'instruction' | 'prompt' | 'chatmode'): boolean {
+	/**
+	 * Index a skill folder by recursively fetching its contents
+	 */
+	private async indexSkillFolder(
+		repository: OnlineRepository,
+		folderPath: string,
+		skillName: string
+	): Promise<RemoteFile | null> {
+		this._logger.debug(`Indexing skill folder: ${folderPath}`);
+
+		try {
+			// Fetch folder contents
+			const folderFiles = await this.fetchFolderContentsRecursive(repository, folderPath);
+
+			// Check if folder contains SKILL.md (marker file)
+			const hasSkillMarker = folderFiles.some(f => f.name.toUpperCase() === 'SKILL.MD');
+
+			if (!hasSkillMarker) {
+				this._logger.debug(`Skipping ${folderPath} - no SKILL.md found`);
+				return null;
+			}
+
+			// Build RemoteFile with folder metadata
+			const skillFile: RemoteFile = {
+				name: skillName,
+				path: folderPath,
+				type: 'skill',
+				sha: '', // Folders don't have SHA
+				size: folderFiles.reduce((sum, f) => sum + f.size, 0),
+				downloadUrl: '', // Folders don't have download URL
+				repository,
+				lastIndexed: new Date(),
+				// Folder-specific metadata
+				isFolder: true,
+				files: folderFiles.map(f => ({
+					relativePath: f.path.replace(`${folderPath}/`, ''),
+					fullPath: f.path,
+					sha: f.sha,
+					size: f.size,
+					downloadUrl: f.downloadUrl
+				}))
+			};
+
+			this._logger.debug(`Indexed skill: ${skillName} with ${folderFiles.length} files`);
+			return skillFile;
+
+		} catch (error) {
+			this._logger.error(`Failed to index skill folder ${folderPath}`, error);
+			return null;
+		}
+	}
+
+	/**
+	 * Recursively fetch all files in a folder
+	 */
+	private async fetchFolderContentsRecursive(
+		repository: OnlineRepository,
+		folderPath: string
+	): Promise<Array<{ name: string; path: string; sha: string; size: number; downloadUrl: string }>> {
+		const apiUrl = `https://api.github.com/repos/${repository.owner}/${repository.repo}/contents/${folderPath}`;
+		const response = await this.makeGitHubApiRequest(apiUrl, repository);
+
+		if (!response.success || !Array.isArray(response.data)) {
+			return [];
+		}
+
+		const files: Array<{ name: string; path: string; sha: string; size: number; downloadUrl: string }> = [];
+
+		for (const item of response.data) {
+			if (item.type === 'file') {
+				files.push({
+					name: item.name,
+					path: item.path,
+					sha: item.sha,
+					size: item.size,
+					downloadUrl: item.download_url
+				});
+			} else if (item.type === 'dir') {
+				// Recursively fetch subdirectory contents
+				const subFiles = await this.fetchFolderContentsRecursive(repository, item.path);
+				files.push(...subFiles);
+			}
+		}
+
+		return files;
+	}
+
+	private isValidFileForType(fileName: string, fileType: 'instruction' | 'prompt' | 'agent' | 'skill' | 'cookbook'): boolean {
 		const lowerName = fileName.toLowerCase();
 		switch (fileType) {
 			case 'instruction':
 				return lowerName.endsWith('.instructions.md') || lowerName.endsWith('.instruction.md');
 			case 'prompt':
 				return lowerName.endsWith('.prompt.md');
-			case 'chatmode':
-				return lowerName.endsWith('.chatmode.md');
+			case 'agent':
+				return lowerName.endsWith('.agent.md');
+			case 'skill':
+				return lowerName === 'skill.md' || lowerName.endsWith('.skill.md');
+			case 'cookbook':
+				return lowerName.endsWith('.cookbook.md');
 			default:
 				return false;
 		}
@@ -341,7 +452,9 @@ export class RepositoryManager {
 	public async getEnhancedCatalog(localCatalog: {
 		instructions: string[];
 		prompts: string[];
-		chatmodes: string[];
+		agents: string[];
+		skills: string[];
+		cookbooks: string[];
 	}): Promise<EnhancedCatalog> {
 		this._logger.info('Building enhanced catalog...');
 
@@ -349,7 +462,9 @@ export class RepositoryManager {
 
 		const remoteInstructions: RemoteFile[] = [];
 		const remotePrompts: RemoteFile[] = [];
-		const remoteChatmodes: RemoteFile[] = [];
+		const remoteAgents: RemoteFile[] = [];
+		const remoteSkills: RemoteFile[] = [];
+		const remoteCookbooks: RemoteFile[] = [];
 
 		for (const index of this.indexes.values()) {
 			if (!index.isValid) continue;
@@ -357,7 +472,9 @@ export class RepositoryManager {
 				switch (file.type) {
 					case 'instruction': remoteInstructions.push(file); break;
 					case 'prompt': remotePrompts.push(file); break;
-					case 'chatmode': remoteChatmodes.push(file); break;
+					case 'agent': remoteAgents.push(file); break;
+					case 'skill': remoteSkills.push(file); break;
+					case 'cookbook': remoteCookbooks.push(file); break;
 				}
 			}
 		}
@@ -367,7 +484,9 @@ export class RepositoryManager {
 			remote: {
 				instructions: remoteInstructions,
 				prompts: remotePrompts,
-				chatmodes: remoteChatmodes
+				agents: remoteAgents,
+				skills: remoteSkills,
+				cookbooks: remoteCookbooks
 			},
 			combined: {
 				instructions: [
@@ -378,14 +497,22 @@ export class RepositoryManager {
 					...localCatalog.prompts,
 					...remotePrompts.map(f => `${f.name} - ${f.repository.name} (remote)`)
 				],
-				chatmodes: [
-					...localCatalog.chatmodes,
-					...remoteChatmodes.map(f => `${f.name} - ${f.repository.name} (remote)`)
+				agents: [
+					...localCatalog.agents,
+					...remoteAgents.map(f => `${f.name} - ${f.repository.name} (remote)`)
+				],
+				skills: [
+					...localCatalog.skills,
+					...remoteSkills.map(f => `${f.name} - ${f.repository.name} (remote)`)
+				],
+				cookbooks: [
+					...localCatalog.cookbooks,
+					...remoteCookbooks.map(f => `${f.name} - ${f.repository.name} (remote)`)
 				]
 			},
 			metadata: {
-				localCount: localCatalog.instructions.length + localCatalog.prompts.length + localCatalog.chatmodes.length,
-				remoteCount: remoteInstructions.length + remotePrompts.length + remoteChatmodes.length,
+				localCount: localCatalog.instructions.length + localCatalog.prompts.length + localCatalog.agents.length + localCatalog.skills.length + localCatalog.cookbooks.length,
+				remoteCount: remoteInstructions.length + remotePrompts.length + remoteAgents.length + remoteSkills.length + remoteCookbooks.length,
 				totalCount: 0,
 				lastUpdated: new Date(),
 				repositories: Array.from(this.repositories.keys())
@@ -398,7 +525,7 @@ export class RepositoryManager {
 		return catalog;
 	}
 
-	public getRemoteFilesByType(type: 'instruction' | 'prompt' | 'chatmode'): RemoteFile[] {
+	public getRemoteFilesByType(type: 'instruction' | 'prompt' | 'agent' | 'skill' | 'cookbook'): RemoteFile[] {
 		const files: RemoteFile[] = [];
 		for (const index of this.indexes.values()) {
 			if (!index.isValid) continue;
@@ -407,7 +534,7 @@ export class RepositoryManager {
 		return files;
 	}
 
-	public searchFiles(query: string, type?: 'instruction' | 'prompt' | 'chatmode'): RemoteFile[] {
+	public searchFiles(query: string, type?: 'instruction' | 'prompt' | 'agent' | 'skill' | 'cookbook'): RemoteFile[] {
 		const results: RemoteFile[] = [];
 		const queryLower = query.toLowerCase();
 
@@ -427,7 +554,12 @@ export class RepositoryManager {
 
 	private isIndexValid(index: RepositoryIndex): boolean {
 		const now = new Date();
-		return index.isValid && (now.getTime() - index.indexedAt.getTime()) < index.ttl;
+		const isTimestampValid = index.isValid && (now.getTime() - index.indexedAt.getTime()) < index.ttl;
+
+		// Invalidate old indexes that don't have the new fields (pre-0.4.0)
+		const hasNewFields = index.stats.hasOwnProperty('skillFiles') && index.stats.hasOwnProperty('cookbookFiles');
+
+		return isTimestampValid && hasNewFields;
 	}
 
 	private isCacheValid(cached: CachedFile): boolean {
@@ -437,10 +569,11 @@ export class RepositoryManager {
 
 	public getStatistics(): {
 		repositories: number; totalFiles: number;
-		instructionFiles: number; promptFiles: number; chatmodeFiles: number;
+		instructionFiles: number; promptFiles: number; agentFiles: number;
+		skillFiles: number; cookbookFiles: number;
 		cacheSize: number; lastIndexed: Date | null;
 	} {
-		let totalFiles = 0, instructionFiles = 0, promptFiles = 0, chatmodeFiles = 0;
+		let totalFiles = 0, instructionFiles = 0, promptFiles = 0, agentFiles = 0, skillFiles = 0, cookbookFiles = 0;
 		let lastIndexed: Date | null = null;
 
 		for (const index of this.indexes.values()) {
@@ -448,11 +581,13 @@ export class RepositoryManager {
 			totalFiles += index.stats.totalFiles;
 			instructionFiles += index.stats.instructionFiles;
 			promptFiles += index.stats.promptFiles;
-			chatmodeFiles += index.stats.chatmodeFiles;
+			agentFiles += index.stats.agentFiles;
+			skillFiles += index.stats.skillFiles;
+			cookbookFiles += index.stats.cookbookFiles;
 			if (!lastIndexed || index.indexedAt > lastIndexed) lastIndexed = index.indexedAt;
 		}
 
-		return { repositories: this.repositories.size, totalFiles, instructionFiles, promptFiles, chatmodeFiles, cacheSize: this.fileCache.size, lastIndexed };
+		return { repositories: this.repositories.size, totalFiles, instructionFiles, promptFiles, agentFiles, skillFiles, cookbookFiles, cacheSize: this.fileCache.size, lastIndexed };
 	}
 
 	public clearCache(): void {

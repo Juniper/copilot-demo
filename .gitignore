@@ -7,3 +7,4 @@ out/
 *.d.ts.map
 .DS_Store
 *.tgz
+planning-docs/

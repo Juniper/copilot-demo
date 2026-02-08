@@ -80,7 +80,12 @@ export class FileInstaller {
 		targetDir: string,
 		conflictResolution?: ConflictResolution,
 	): Promise<InstallationResult> {
-		this._logger.info(`Installing file: ${file.name}`);
+		this._logger.info(`Installing ${file.isFolder ? 'folder' : 'file'}: ${file.name}`);
+
+		// Handle folder-based installations (e.g., skills)
+		if (file.isFolder && file.files && file.files.length > 0) {
+			return this._installFolder(file, targetDir, conflictResolution);
+		}
 
 		try {
 			const targetPath = this._getTargetPath(file, targetDir);
@@ -182,6 +187,96 @@ export class FileInstaller {
 		return results;
 	}
 
+	/**
+	 * Install a folder with all its files (e.g., skills).
+	 */
+	private async _installFolder(
+		file: InstallableFile,
+		targetDir: string,
+		conflictResolution?: ConflictResolution,
+	): Promise<InstallationResult> {
+		this._logger.info(`Installing folder: ${file.name} (${file.files?.length || 0} files)`);
+
+		try {
+			// Get target folder path
+			const targetFolderPath = path.join(targetDir, '.github', 'skills', file.name);
+			this._logger.info(`Target folder path: ${targetFolderPath}`);
+
+			// Check if folder exists
+			const folderExists = await this._directoryExists(targetFolderPath);
+
+			if (folderExists && !conflictResolution) {
+				const error = 'Folder already exists and no conflict resolution provided';
+				this._logger.warn(`Installation conflict: ${error}`);
+				return {
+					success: false,
+					filePath: targetFolderPath,
+					fileName: file.name,
+					error,
+				};
+			}
+
+			// Handle conflict resolution — skip
+			if (folderExists && conflictResolution === ConflictResolution.SKIP) {
+				this._logger.info(`Skipping folder due to conflict: ${file.name}`);
+				return {
+					success: true,
+					filePath: targetFolderPath,
+					fileName: file.name,
+					skipped: true,
+				};
+			}
+
+			// Create target folder
+			await this._fileSystem.mkdir(targetFolderPath, { recursive: true });
+
+			// Install all files in the folder
+			let filesInstalled = 0;
+			const totalFiles = file.files?.length || 0;
+
+			for (const childFile of file.files || []) {
+				try {
+					const targetFilePath = path.join(targetFolderPath, childFile.relativePath);
+
+					// Ensure subdirectories exist
+					const parentDir = path.dirname(targetFilePath);
+					await this._fileSystem.mkdir(parentDir, { recursive: true });
+
+					// Fetch and write file content
+					const content = await this._fetchFileFromUrl(childFile.downloadUrl || '');
+					await this._fileSystem.writeFile(targetFilePath, content);
+
+					filesInstalled++;
+					this._logger.debug(`Installed file: ${childFile.relativePath}`);
+				} catch (error) {
+					this._logger.error(`Failed to install file ${childFile.relativePath}:`, error);
+					// Continue with other files even if one fails
+				}
+			}
+
+			const overwritten = folderExists && conflictResolution === ConflictResolution.OVERWRITE;
+			this._logger.info(`Folder installed successfully: ${file.name} (${filesInstalled}/${totalFiles} files)`);
+
+			return {
+				success: true,
+				filePath: targetFolderPath,
+				fileName: file.name,
+				overwritten,
+				filesInstalled,
+				totalFiles,
+			};
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			this._logger.error(`Folder installation failed for ${file.name}: ${errorMessage}`, error);
+			return {
+				success: false,
+				filePath: '',
+				fileName: file.name,
+				error: errorMessage,
+			};
+		}
+	}
+
 	// ── Path helpers ───────────────────────────────────────────────────
 
 	/**
@@ -202,14 +297,21 @@ export class FileInstaller {
 			case 'prompt':
 				subdirectory = 'prompts';
 				break;
-			case 'chatmode':
-				subdirectory = 'chatmodes';
+			case 'agent':
+				subdirectory = 'agents';
+				break;
+			case 'skill':
+				subdirectory = 'skills';
+				break;
+			case 'cookbook':
+				subdirectory = 'cookbooks';
 				break;
 			default:
 				subdirectory = 'instructions'; // fallback
 		}
 
-		const fileName = this._ensureFileExtension(file.name, file.type);
+		// Extract the actual filename from the path instead of using the display name
+		const fileName = path.basename(file.path);
 		return path.join(targetDir, '.github', subdirectory, fileName);
 	}
 
@@ -220,7 +322,9 @@ export class FileInstaller {
 		const extensions: Record<string, string> = {
 			'instruction': '.instructions.md',
 			'prompt': '.prompt.md',
-			'chatmode': '.chatmode.md',
+			'agent': '.agent.md',
+			'skill': '.skill.md',
+			'cookbook': '.cookbook.md',
 		};
 
 		const expectedExtension = extensions[type] || '.md';
@@ -251,13 +355,19 @@ export class FileInstaller {
 	// ── Status check ───────────────────────────────────────────────────
 
 	/**
-	 * Determine the installation status of a single file.
+	 * Determine the installation status of a single file or folder.
 	 */
 	private async _checkFileStatus(
 		file: InstallableFile,
 		targetPath: string,
 	): Promise<InstallationStatus> {
 		try {
+			// Handle folder-based installations (e.g., skills)
+			if (file.isFolder && file.files) {
+				return this._checkFolderStatus(file, targetPath);
+			}
+
+			// Handle regular files
 			const exists = await this._fileExists(targetPath);
 			if (!exists) {
 				return 'available';
@@ -271,6 +381,48 @@ export class FileInstaller {
 		} catch (error) {
 			this._logger.warn(`Error checking status for ${file.name}: ${error}`);
 			return 'available'; // default to available on error
+		}
+	}
+
+	/**
+	 * Check installation status for a folder.
+	 */
+	private async _checkFolderStatus(
+		file: InstallableFile,
+		targetPath: string,
+	): Promise<InstallationStatus> {
+		try {
+			// For folders, targetPath should be the folder directory
+			const folderPath = path.join(path.dirname(targetPath), '..', 'skills', file.name);
+			const folderExists = await this._directoryExists(folderPath);
+
+			if (!folderExists) {
+				return 'available';
+			}
+
+			// Folder exists - check if files match
+			let matchingFiles = 0;
+			let totalFiles = file.files?.length || 0;
+
+			for (const childFile of file.files || []) {
+				const targetFilePath = path.join(folderPath, childFile.relativePath);
+				const fileExists = await this._fileExists(targetFilePath);
+
+				if (fileExists) {
+					matchingFiles++;
+				}
+			}
+
+			if (matchingFiles === 0) {
+				return 'available'; // folder exists but no matching files
+			} else if (matchingFiles === totalFiles) {
+				return 'installed'; // all files match
+			} else {
+				return 'partial'; // some files match
+			}
+		} catch (error) {
+			this._logger.warn(`Error checking folder status for ${file.name}: ${error}`);
+			return 'available';
 		}
 	}
 
@@ -307,7 +459,7 @@ export class FileInstaller {
 				throw new Error(`Invalid catalog path format: ${file.path}`);
 			}
 
-			const fileType = pathParts[1]; // instructions | prompts | chatmodes
+			const fileType = pathParts[1]; // instructions | prompts | agents | skills | cookbooks
 			const fileName = pathParts[2];
 
 			// Resolve remote repository config from PaletteConfig
@@ -325,8 +477,14 @@ export class FileInstaller {
 				case 'prompts':
 					repoPath = `prompts/${fileName}.prompt.md`;
 					break;
-				case 'chatmodes':
-					repoPath = `chatmodes/${fileName}.chatmode.md`;
+				case 'agents':
+					repoPath = `agents/${fileName}.agent.md`;
+					break;
+				case 'skills':
+					repoPath = `skills/${fileName}.skill.md`;
+					break;
+				case 'cookbooks':
+					repoPath = `cookbooks/${fileName}.cookbook.md`;
 					break;
 				default:
 					throw new Error(`Unknown file type: ${fileType}`);
@@ -430,6 +588,40 @@ export class FileInstaller {
 			return await this._fileSystem.exists(filePath);
 		} catch {
 			return false;
+		}
+	}
+
+	/**
+	 * Check whether a directory exists at `dirPath`.
+	 */
+	private async _directoryExists(dirPath: string): Promise<boolean> {
+		try {
+			return await this._fileSystem.exists(dirPath);
+		} catch {
+			return false;
+		}
+	}
+
+	/**
+	 * Fetch file content from a URL.
+	 */
+	private async _fetchFileFromUrl(url: string): Promise<string> {
+		this._logger.debug(`Fetching file from URL: ${url}`);
+
+		try {
+			const response = await fetch(url);
+
+			if (!response.ok) {
+				throw new Error(`HTTP error! status: ${response.status}`);
+			}
+
+			const content = await response.text();
+			this._logger.debug(`Fetched ${content.length} characters from ${url}`);
+			return content;
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			this._logger.error(`Failed to fetch from ${url}: ${errorMessage}`);
+			throw error;
 		}
 	}
 }

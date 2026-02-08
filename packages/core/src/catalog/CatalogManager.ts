@@ -12,6 +12,7 @@ import type { PaletteConfig } from '../interfaces/Config.js';
 import type {
 	CatalogEntry,
 	EnhancedCatalog,
+	EnhancedStatistics,
 	CatalogCacheConfig,
 	CatalogCacheState,
 	CatalogCacheEntry,
@@ -60,13 +61,17 @@ export class CatalogManager {
 		this.localCatalog = [...defaultCatalogEntries];
 
 		const instructions = this.localCatalog.filter(e => e.type === 'instruction').length;
-		const chatmodes = this.localCatalog.filter(e => e.type === 'chatmode').length;
+		const agents = this.localCatalog.filter(e => e.type === 'agent').length;
 		const prompts = this.localCatalog.filter(e => e.type === 'prompt').length;
+		const skills = this.localCatalog.filter(e => e.type === 'skill').length;
+		const cookbooks = this.localCatalog.filter(e => e.type === 'cookbook').length;
 
 		this._logger.info(`Local catalog initialized: ${this.localCatalog.length} entries`);
 		this._logger.debug(`  Instructions: ${instructions}`);
-		this._logger.debug(`  Chat Modes: ${chatmodes}`);
+		this._logger.debug(`  Agents: ${agents}`);
 		this._logger.debug(`  Prompts: ${prompts}`);
+		this._logger.debug(`  Skills: ${skills}`);
+		this._logger.debug(`  Cookbooks: ${cookbooks}`);
 	}
 
 	// -----------------------------------------------------------------------
@@ -117,13 +122,17 @@ export class CatalogManager {
 				local: localCatalog,
 				combined: {
 					instructions: localCatalog.instructions,
-					chatmodes: localCatalog.chatmodes,
-					prompts: localCatalog.prompts
+					agents: localCatalog.agents,
+					prompts: localCatalog.prompts,
+					skills: localCatalog.skills || [],
+					cookbooks: localCatalog.cookbooks || []
 				},
 				remote: {
 					instructions: [],
 					prompts: [],
-					chatmodes: []
+					agents: [],
+					skills: [],
+					cookbooks: []
 				},
 				metadata: {
 					localCount: this.localCatalog.length,
@@ -155,7 +164,9 @@ export class CatalogManager {
 	private async getLocalCatalogData(): Promise<{
 		instructions: string[];
 		prompts: string[];
-		chatmodes: string[];
+		agents: string[];
+		skills: string[];
+		cookbooks: string[];
 	}> {
 		// Check local catalog cache (version-based invalidation)
 		if (this.isCacheValid(this.cacheState.localCatalog, true)) {
@@ -171,18 +182,28 @@ export class CatalogManager {
 			.filter(entry => entry.type === 'instruction')
 			.map(entry => `${entry.filePath} - ${entry.description}`);
 
-		const localChatmodes = this.localCatalog
-			.filter(entry => entry.type === 'chatmode')
+		const localAgents = this.localCatalog
+			.filter(entry => entry.type === 'agent')
 			.map(entry => `${entry.filePath} - ${entry.description}`);
 
 		const localPrompts = this.localCatalog
 			.filter(entry => entry.type === 'prompt')
 			.map(entry => `${entry.filePath} - ${entry.description}`);
 
+		const localSkills = this.localCatalog
+			.filter(entry => entry.type === 'skill')
+			.map(entry => `${entry.filePath} - ${entry.description}`);
+
+		const localCookbooks = this.localCatalog
+			.filter(entry => entry.type === 'cookbook')
+			.map(entry => `${entry.filePath} - ${entry.description}`);
+
 		const localData = {
 			instructions: localInstructions,
 			prompts: localPrompts,
-			chatmodes: localChatmodes
+			agents: localAgents,
+			skills: localSkills,
+			cookbooks: localCookbooks
 		};
 
 		// Cache the local data (never expires except on version change)
@@ -190,7 +211,7 @@ export class CatalogManager {
 		this.cacheState.localCatalog.ttl = this.cacheConfig.localCatalogTtl;
 
 		this._logger.debug(
-			`Local catalog cached: ${localInstructions.length + localPrompts.length + localChatmodes.length} items`
+			`Local catalog cached: ${localInstructions.length + localPrompts.length + localAgents.length + localSkills.length + localCookbooks.length} items`
 		);
 		return localData;
 	}
@@ -205,7 +226,9 @@ export class CatalogManager {
 	private async getOnlineCatalogData(): Promise<{
 		instructions: string[];
 		prompts: string[];
-		chatmodes: string[];
+		agents: string[];
+		skills: string[];
+		cookbooks: string[];
 	}> {
 		// Check online catalog cache (time-based invalidation)
 		if (this.isCacheValid(this.cacheState.onlineCatalog)) {
@@ -225,7 +248,9 @@ export class CatalogManager {
 			const onlineData = {
 				instructions: tempEnhanced.combined.instructions.filter((i: string) => i.includes('(remote)')),
 				prompts: tempEnhanced.combined.prompts.filter((p: string) => p.includes('(remote)')),
-				chatmodes: tempEnhanced.combined.chatmodes.filter((c: string) => c.includes('(remote)'))
+				agents: tempEnhanced.combined.agents.filter((c: string) => c.includes('(remote)')),
+				skills: tempEnhanced.combined.skills.filter((s: string) => s.includes('(remote)')),
+				cookbooks: tempEnhanced.combined.cookbooks.filter((cb: string) => cb.includes('(remote)'))
 			};
 
 			// Cache the online data
@@ -233,7 +258,7 @@ export class CatalogManager {
 			this.cacheState.onlineCatalog.ttl = this.cacheConfig.onlineCatalogTtl;
 
 			this._logger.debug(
-				`Online catalog cached: ${onlineData.instructions.length + onlineData.prompts.length + onlineData.chatmodes.length} items`
+				`Online catalog cached: ${onlineData.instructions.length + onlineData.prompts.length + onlineData.agents.length + onlineData.skills.length + onlineData.cookbooks.length} items`
 			);
 			return onlineData;
 
@@ -244,7 +269,9 @@ export class CatalogManager {
 			const emptyOnlineData = {
 				instructions: [] as string[],
 				prompts: [] as string[],
-				chatmodes: [] as string[]
+				agents: [] as string[],
+				skills: [] as string[],
+				cookbooks: [] as string[]
 			};
 
 			// Cache empty result with shorter TTL for retry
@@ -263,8 +290,8 @@ export class CatalogManager {
 	 * Combine local and online catalogs via the RepositoryManager.
 	 */
 	private async combineLocalAndOnlineCatalogs(
-		localData: { instructions: string[]; prompts: string[]; chatmodes: string[] },
-		_onlineData: { instructions: string[]; prompts: string[]; chatmodes: string[] }
+		localData: { instructions: string[]; prompts: string[]; agents: string[]; skills: string[]; cookbooks: string[] },
+		_onlineData: { instructions: string[]; prompts: string[]; agents: string[]; skills: string[]; cookbooks: string[] }
 	): Promise<EnhancedCatalog> {
 		// Delegate to RepositoryManager which owns the merging logic
 		return await this._repositoryManager.getEnhancedCatalog(localData);
@@ -328,8 +355,8 @@ export class CatalogManager {
 **Instructions (${enhancedCatalog.combined.instructions.length} available):**
 ${enhancedCatalog.combined.instructions.map(i => `- ${i}`).join('\n')}
 
-**Chat Modes (${enhancedCatalog.combined.chatmodes.length} available):**
-${enhancedCatalog.combined.chatmodes.map(c => `- ${c}`).join('\n')}
+**Agents (${enhancedCatalog.combined.agents.length} available):**
+${enhancedCatalog.combined.agents.map(c => `- ${c}`).join('\n')}
 
 **Prompts (${enhancedCatalog.combined.prompts.length} available):**
 ${enhancedCatalog.combined.prompts.map(p => `- ${p}`).join('\n')}
@@ -348,19 +375,115 @@ ${enhancedCatalog.combined.prompts.map(p => `- ${p}`).join('\n')}
 	/** Aggregate statistics about the local catalog. */
 	getStatistics() {
 		const instructions = this.localCatalog.filter(e => e.type === 'instruction').length;
-		const chatmodes = this.localCatalog.filter(e => e.type === 'chatmode').length;
+		const agents = this.localCatalog.filter(e => e.type === 'agent').length;
 		const prompts = this.localCatalog.filter(e => e.type === 'prompt').length;
+		const skills = this.localCatalog.filter(e => e.type === 'skill').length;
+		const cookbooks = this.localCatalog.filter(e => e.type === 'cookbook').length;
 
 		return {
 			totalEntries: this.localCatalog.length,
 			instructions,
-			chatmodes,
+			agents,
 			prompts,
+			skills,
+			cookbooks,
 			categories: [...new Set(this.localCatalog.map(e => e.category))],
 			languages: [...new Set(this.localCatalog.flatMap(e => e.metadata.languages || []))],
 			frameworks: [...new Set(this.localCatalog.flatMap(e => e.metadata.frameworks || []))],
 			projectTypes: [...new Set(this.localCatalog.flatMap(e => e.metadata.projectTypes || []))]
 		};
+	}
+
+	/**
+	 * Get comprehensive statistics including local and remote catalog data.
+	 * Includes installation status and sync timestamp.
+	 *
+	 * @param targetDir Optional workspace directory for installation status checks
+	 * @param fileInstaller Optional FileInstaller instance for status checks
+	 */
+	async getEnhancedStatistics(
+		targetDir?: string,
+		fileInstaller?: any // Avoid circular dependency
+	): Promise<EnhancedStatistics> {
+		// Get enhanced catalog (includes remote data)
+		const enhanced = await this.getEnhancedCatalog();
+
+		// Base statistics
+		const stats: EnhancedStatistics = {
+			// Total counts
+			totalEntries: enhanced.metadata.totalCount,
+			localEntries: enhanced.metadata.localCount,
+			remoteEntries: enhanced.metadata.remoteCount,
+
+			// Per-type breakdown
+			instructions: {
+				local: enhanced.local.instructions.length,
+				remote: enhanced.remote.instructions.length,
+				total: enhanced.combined.instructions.length
+			},
+			prompts: {
+				local: enhanced.local.prompts.length,
+				remote: enhanced.remote.prompts.length,
+				total: enhanced.combined.prompts.length
+			},
+			agents: {
+				local: enhanced.local.agents.length,
+				remote: enhanced.remote.agents.length,
+				total: enhanced.combined.agents.length
+			},
+			skills: {
+				local: enhanced.local.skills.length,
+				remote: enhanced.remote.skills.length,
+				total: enhanced.combined.skills.length
+			},
+			cookbooks: {
+				local: enhanced.local.cookbooks.length,
+				remote: enhanced.remote.cookbooks.length,
+				total: enhanced.combined.cookbooks.length
+			},
+
+			// Metadata
+			lastUpdated: enhanced.metadata.lastUpdated,
+			repositories: enhanced.metadata.repositories,
+
+			// Installation status (optional)
+			installation: undefined
+		};
+
+		// Add installation status if workspace available
+		if (targetDir && fileInstaller) {
+			const catalogEntries = this.getAll(); // Get all CatalogEntry objects
+			const installableFiles = catalogEntries.map(entry => ({
+				name: entry.name,
+				type: entry.type,
+				path: entry.filePath,  // Map filePath to path
+				description: entry.description,
+				source: 'Bundled' as const
+			}));
+
+			const filesWithStatus = await fileInstaller.getInstallationStatus(
+				installableFiles,
+				targetDir
+			);
+
+			const installed = filesWithStatus.filter((f: any) => f.status === 'installed');
+			const installationByType = {
+				instructions: installed.filter((f: any) => f.type === 'instruction').length,
+				prompts: installed.filter((f: any) => f.type === 'prompt').length,
+				agents: installed.filter((f: any) => f.type === 'agent').length,
+				skills: installed.filter((f: any) => f.type === 'skill').length,
+				cookbooks: installed.filter((f: any) => f.type === 'cookbook').length
+			};
+
+			stats.installation = {
+				totalInstalled: installed.length,
+				totalAvailable: filesWithStatus.length,
+				percentage: Math.round((installed.length / filesWithStatus.length) * 100),
+				byType: installationByType
+			};
+		}
+
+		return stats;
 	}
 
 	// -----------------------------------------------------------------------

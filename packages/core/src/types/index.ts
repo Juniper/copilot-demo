@@ -5,6 +5,9 @@
 export type {
 	CatalogEntry,
 	EnhancedCatalog,
+	EnhancedStatistics,
+	TypeStatistics,
+	InstallationStatistics,
 	Recommendation,
 	RecommendationSet,
 	CatalogCacheConfig,

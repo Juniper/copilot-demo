@@ -175,9 +175,19 @@ export class CatalogTemplate extends BaseTemplate {
                 color: white;
             }
 
-            .type-chatmode {
+            .type-agent {
                 background-color: #ffc107;
                 color: black;
+            }
+
+            .type-skill {
+                background-color: #9c27b0;
+                color: white;
+            }
+
+            .type-cookbook {
+                background-color: #ff5722;
+                color: white;
             }
 
             .source-bundled {
@@ -613,7 +623,9 @@ export class CatalogTemplate extends BaseTemplate {
                 <div class="quick-filters">
                     <button class="filter-button" data-filter="type:instruction">Instructions</button>
                     <button class="filter-button" data-filter="type:prompt">Prompts</button>
-                    <button class="filter-button" data-filter="type:chatmode">Chat Modes</button>
+                    <button class="filter-button" data-filter="type:agent">Agents</button>
+                    <button class="filter-button" data-filter="type:skill">Skills</button>
+                    <!-- <button class="filter-button" data-filter="type:cookbook">Cookbooks</button> -->
                     <button class="filter-button" data-filter="source:bundled">Bundled</button>
                     <button class="filter-button" data-filter="source:online">Online</button>
                     <button class="filter-button" data-filter="status:available">Available</button>
@@ -652,7 +664,9 @@ export class CatalogTemplate extends BaseTemplate {
 	private _generateSummary(filesWithStatus: InstallableFileWithStatus[]): string {
 		const instructionCount = filesWithStatus.filter(item => item.type === 'instruction').length;
 		const promptCount = filesWithStatus.filter(item => item.type === 'prompt').length;
-		const chatmodeCount = filesWithStatus.filter(item => item.type === 'chatmode').length;
+		const agentCount = filesWithStatus.filter(item => item.type === 'agent').length;
+		const skillCount = filesWithStatus.filter(item => item.type === 'skill').length;
+		const cookbookCount = filesWithStatus.filter(item => item.type === 'cookbook').length;
 		const bundledCount = filesWithStatus.filter(item => item.source === 'Bundled').length;
 		const onlineCount = filesWithStatus.filter(item => item.source === 'Online').length;
 		const availableCount = filesWithStatus.filter(item => item.status === 'available').length;
@@ -664,7 +678,9 @@ export class CatalogTemplate extends BaseTemplate {
                 <strong>Total Files:</strong> ${filesWithStatus.length}<br>
                 <strong>Instructions:</strong> ${instructionCount} |
                 <strong>Prompts:</strong> ${promptCount} |
-                <strong>Chat Modes:</strong> ${chatmodeCount}<br>
+                <strong>Agents:</strong> ${agentCount} |
+                <strong>Skills:</strong> ${skillCount} |
+                <strong>Cookbooks:</strong> ${cookbookCount}<br>
                 <strong>Bundled:</strong> ${bundledCount} |
                 <strong>Online:</strong> ${onlineCount}<br>
                 <strong>Available:</strong> ${availableCount} |
@@ -750,7 +766,7 @@ export class CatalogTemplate extends BaseTemplate {
 	private _generateFooter(): string {
 		return `
             <div class="catalog-footer">
-                Awesome Palette — browse and install GitHub Copilot instructions, prompts, and chatmodes
+                Awesome Palette — browse and install GitHub Copilot instructions, prompts, and agents
             </div>
         `;
 	}

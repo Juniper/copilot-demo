@@ -16,7 +16,7 @@ const languageInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'language',
 		description: 'Python development standards and best practices',
-		filePath: 'python.instructions.md',
+		filePath: 'instructions/python.instructions.md',
 		metadata: { languages: ['python'], projectTypes: ['web', 'cli', 'library', 'data'] }
 	},
 	{
@@ -25,7 +25,7 @@ const languageInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'language',
 		description: 'C++ coding conventions and guidelines',
-		filePath: 'cpp.instructions.md',
+		filePath: 'instructions/cpp.instructions.md',
 		metadata: { languages: ['cpp', 'c'], projectTypes: ['desktop', 'library', 'embedded'] }
 	},
 	{
@@ -34,7 +34,7 @@ const languageInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'language',
 		description: 'Go idioms and best practices',
-		filePath: 'go.instructions.md',
+		filePath: 'instructions/go.instructions.md',
 		metadata: { languages: ['go'], projectTypes: ['web', 'cli', 'microservice'] }
 	}
 ];
@@ -49,7 +49,7 @@ const domainInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'domain',
 		description: 'Algorithm implementation guidelines',
-		filePath: 'algorithms.instructions.md',
+		filePath: 'instructions/algorithms.instructions.md',
 		metadata: { characteristics: ['algorithmic', 'performance-critical'] }
 	},
 	{
@@ -58,7 +58,7 @@ const domainInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'domain',
 		description: 'K8s deployment practices',
-		filePath: 'kubernetes-deployment.instructions.md',
+		filePath: 'instructions/kubernetes-deployment.instructions.md',
 		metadata: { characteristics: ['containerized', 'cloud-native'], frameworks: ['kubernetes'] }
 	},
 	{
@@ -67,7 +67,7 @@ const domainInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'domain',
 		description: 'Performance tuning guidelines',
-		filePath: 'performance-optimization.instructions.md',
+		filePath: 'instructions/performance-optimization.instructions.md',
 		metadata: { characteristics: ['performance-critical', 'high-load'] }
 	},
 	{
@@ -76,7 +76,7 @@ const domainInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'domain',
 		description: 'Testing strategies and patterns',
-		filePath: 'testing.instructions.md',
+		filePath: 'instructions/testing.instructions.md',
 		metadata: { characteristics: ['test-driven', 'quality-focused'] }
 	},
 	{
@@ -85,7 +85,7 @@ const domainInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'domain',
 		description: 'System design principles',
-		filePath: 'design.instructions.md',
+		filePath: 'instructions/design.instructions.md',
 		metadata: { projectTypes: ['web', 'microservice', 'fullstack'], characteristics: ['architectural'] }
 	},
 	{
@@ -94,7 +94,7 @@ const domainInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'process',
 		description: 'Documentation standards',
-		filePath: 'documentation.instructions.md',
+		filePath: 'instructions/documentation.instructions.md',
 		metadata: { characteristics: ['documentation-heavy', 'open-source'] }
 	}
 ];
@@ -109,7 +109,7 @@ const processInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'process',
 		description: 'Code generation guidelines',
-		filePath: 'code-gen.instructions.md',
+		filePath: 'instructions/code-gen.instructions.md',
 		metadata: { characteristics: ['automated', 'templated'] }
 	},
 	{
@@ -118,7 +118,7 @@ const processInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'process',
 		description: 'Code commenting standards',
-		filePath: 'code-comments.instructions.md',
+		filePath: 'instructions/code-comments.instructions.md',
 		metadata: { characteristics: ['maintainable', 'documented'] }
 	},
 	{
@@ -127,7 +127,7 @@ const processInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'process',
 		description: 'Code review practices',
-		filePath: 'review.instructions.md',
+		filePath: 'instructions/review.instructions.md',
 		metadata: { characteristics: ['collaborative', 'quality-focused'] }
 	},
 	{
@@ -136,7 +136,7 @@ const processInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'process',
 		description: 'Project planning methodologies',
-		filePath: 'planning.instructions.md',
+		filePath: 'instructions/planning.instructions.md',
 		metadata: { characteristics: ['planning-intensive', 'structured'] }
 	},
 	{
@@ -145,7 +145,7 @@ const processInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'process',
 		description: 'Research and investigation techniques',
-		filePath: 'research.instructions.md',
+		filePath: 'instructions/research.instructions.md',
 		metadata: { characteristics: ['research-oriented', 'exploratory'] }
 	},
 	{
@@ -154,7 +154,7 @@ const processInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'process',
 		description: 'Task breakdown and management',
-		filePath: 'tasking.instructions.md',
+		filePath: 'instructions/tasking.instructions.md',
 		metadata: { characteristics: ['task-oriented', 'structured'] }
 	},
 	{
@@ -163,7 +163,7 @@ const processInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'process',
 		description: 'Change documentation practices',
-		filePath: 'changelog.instructions.md',
+		filePath: 'instructions/changelog.instructions.md',
 		metadata: { characteristics: ['versioned', 'documented'] }
 	},
 	{
@@ -172,7 +172,7 @@ const processInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'tools',
 		description: 'GitHub Copilot optimization',
-		filePath: 'taming-copilot.instructions.md',
+		filePath: 'instructions/taming-copilot.instructions.md',
 		metadata: { characteristics: ['ai-assisted', 'copilot-optimized'] }
 	},
 	{
@@ -181,7 +181,7 @@ const processInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'process',
 		description: 'Rapid prototyping approaches',
-		filePath: 'prototyping.instructions.md',
+		filePath: 'instructions/prototyping.instructions.md',
 		metadata: { characteristics: ['prototype', 'rapid-development'] }
 	},
 	{
@@ -190,7 +190,7 @@ const processInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'documentation',
 		description: 'Sequence diagram creation',
-		filePath: 'sequences.instructions.md',
+		filePath: 'instructions/sequences.instructions.md',
 		metadata: { characteristics: ['documented', 'visual'] }
 	},
 	{
@@ -199,86 +199,41 @@ const processInstructions: CatalogEntry[] = [
 		type: 'instruction',
 		category: 'documentation',
 		description: 'UML diagram standards',
-		filePath: 'uml.instructions.md',
+		filePath: 'instructions/uml.instructions.md',
 		metadata: { characteristics: ['documented', 'visual', 'architectural'] }
 	}
 ];
 
 // ---------------------------------------------------------------------------
-// Chat modes
+// Agents (formerly chat modes)
 // ---------------------------------------------------------------------------
-const chatModes: CatalogEntry[] = [
+const agents: CatalogEntry[] = [
 	{
-		id: 'code-chatmode',
+		id: 'code-agent',
 		name: 'Code Development Assistant',
-		type: 'chatmode',
+		type: 'agent',
 		category: 'general',
 		description: 'Focused coding assistance mode',
-		filePath: 'Code.chatmode.md',
+		filePath: 'agents/Code.agent.md',
 		metadata: { projectTypes: ['web', 'cli', 'library', 'desktop', 'mobile'] }
 	},
 	{
-		id: 'expert-explainer-chatmode',
+		id: 'expert-explainer-agent',
 		name: 'Expert Technical Explainer',
-		type: 'chatmode',
+		type: 'agent',
 		category: 'learning',
 		description: 'Detailed technical explanations',
-		filePath: 'Expert-Explainer.chatmode.md',
+		filePath: 'agents/Expert-Explainer.agent.md',
 		metadata: { characteristics: ['learning-oriented', 'explanatory'] }
 	},
 	{
-		id: 'research-chatmode',
-		name: 'Research and Investigation Assistant',
-		type: 'chatmode',
-		category: 'research',
-		description: 'Research and investigation mode',
-		filePath: 'Research.chatmode.md',
-		metadata: { characteristics: ['research-oriented', 'exploratory'] }
-	},
-	{
-		id: 'plan-chatmode',
-		name: 'Planning and Architecture Assistant',
-		type: 'chatmode',
-		category: 'planning',
-		description: 'Planning and architecture mode',
-		filePath: 'Plan.chatmode.md',
-		metadata: { characteristics: ['planning-intensive', 'architectural'] }
-	},
-	{
-		id: 'deep-planning-chatmode',
+		id: 'deep-planning-agent',
 		name: 'Deep Planning Specialist',
-		type: 'chatmode',
+		type: 'agent',
 		category: 'planning',
 		description: 'Comprehensive project planning',
-		filePath: 'Deep-Planning.chatmode.md',
+		filePath: 'agents/Deep-Planning.agent.md',
 		metadata: { characteristics: ['planning-intensive', 'strategic'] }
-	},
-	{
-		id: 'autoagent-chatmode',
-		name: 'Autonomous Development Agent',
-		type: 'chatmode',
-		category: 'automation',
-		description: 'Autonomous development agent',
-		filePath: 'AutoAgent.chatmode.md',
-		metadata: { characteristics: ['automated', 'autonomous'] }
-	},
-	{
-		id: 'gpt5-enhanced-chatmode',
-		name: 'GPT-5 Enhanced Reasoning',
-		type: 'chatmode',
-		category: 'advanced',
-		description: 'Enhanced reasoning capabilities',
-		filePath: 'GPT5-Enhanced.chatmode.md',
-		metadata: { characteristics: ['advanced-reasoning', 'complex'] }
-	},
-	{
-		id: 'gpt-claude-cosplay-chatmode',
-		name: 'Multi-AI Perspective Assistant',
-		type: 'chatmode',
-		category: 'advanced',
-		description: 'Alternative AI perspectives',
-		filePath: 'GPT-Claude-Cosplay.chatmode.md',
-		metadata: { characteristics: ['multi-perspective', 'comparative'] }
 	}
 ];
 
@@ -292,7 +247,7 @@ const prompts: CatalogEntry[] = [
 		type: 'prompt',
 		category: 'review',
 		description: 'Code review template',
-		filePath: 'code-review.prompt.md',
+		filePath: 'prompts/code-review.prompt.md',
 		metadata: { characteristics: ['review-focused', 'quality-assurance'] }
 	},
 	{
@@ -301,7 +256,7 @@ const prompts: CatalogEntry[] = [
 		type: 'prompt',
 		category: 'design',
 		description: 'System design template',
-		filePath: 'design.prompt.md',
+		filePath: 'prompts/design.prompt.md',
 		metadata: { characteristics: ['architectural', 'design-focused'] }
 	},
 	{
@@ -310,7 +265,7 @@ const prompts: CatalogEntry[] = [
 		type: 'prompt',
 		category: 'planning',
 		description: 'Project planning template',
-		filePath: 'planning.prompt.md',
+		filePath: 'prompts/planning.prompt.md',
 		metadata: { characteristics: ['planning-intensive'] }
 	},
 	{
@@ -319,7 +274,7 @@ const prompts: CatalogEntry[] = [
 		type: 'prompt',
 		category: 'testing',
 		description: 'Test planning template',
-		filePath: 'testplan.prompt.md',
+		filePath: 'prompts/testplan.prompt.md',
 		metadata: { characteristics: ['test-driven', 'quality-focused'] }
 	},
 	{
@@ -328,7 +283,7 @@ const prompts: CatalogEntry[] = [
 		type: 'prompt',
 		category: 'testing',
 		description: 'Python unit test generation',
-		filePath: 'python-unittests.prompt.md',
+		filePath: 'prompts/python-unittests.prompt.md',
 		metadata: { languages: ['python'], characteristics: ['test-driven'] }
 	},
 	{
@@ -337,7 +292,7 @@ const prompts: CatalogEntry[] = [
 		type: 'prompt',
 		category: 'testing',
 		description: 'C++ unit test generation',
-		filePath: 'cpp-unittests.prompt.md',
+		filePath: 'prompts/cpp-unittests.prompt.md',
 		metadata: { languages: ['cpp', 'c'], characteristics: ['test-driven'] }
 	},
 	{
@@ -346,7 +301,7 @@ const prompts: CatalogEntry[] = [
 		type: 'prompt',
 		category: 'version-control',
 		description: 'Git commit message template',
-		filePath: 'commit-message.prompt.md',
+		filePath: 'prompts/commit-message.prompt.md',
 		metadata: { characteristics: ['version-controlled', 'documented'] }
 	},
 	{
@@ -355,7 +310,7 @@ const prompts: CatalogEntry[] = [
 		type: 'prompt',
 		category: 'planning',
 		description: 'Task breakdown template',
-		filePath: 'task.prompt.md',
+		filePath: 'prompts/task.prompt.md',
 		metadata: { characteristics: ['task-oriented', 'structured'] }
 	},
 	{
@@ -364,8 +319,41 @@ const prompts: CatalogEntry[] = [
 		type: 'prompt',
 		category: 'development',
 		description: 'Rapid prototyping template',
-		filePath: 'prototyping.prompt.md',
+		filePath: 'prompts/prototyping.prompt.md',
 		metadata: { characteristics: ['prototype', 'rapid-development'] }
+	}
+];
+
+// ---------------------------------------------------------------------------
+// Cookbooks (recipes and code snippets)
+// ---------------------------------------------------------------------------
+const cookbooks: CatalogEntry[] = [
+	{
+		id: 'api-design-cookbook',
+		name: 'API Design Cookbook',
+		type: 'cookbook',
+		category: 'design',
+		description: 'API design patterns and best practices',
+		filePath: 'cookbooks/api-design.cookbook.md',
+		metadata: { projectTypes: ['web', 'microservice'], characteristics: ['api-focused'] }
+	},
+	{
+		id: 'testing-cookbook',
+		name: 'Testing Strategies Cookbook',
+		type: 'cookbook',
+		category: 'testing',
+		description: 'Testing patterns, strategies, and examples',
+		filePath: 'cookbooks/testing.cookbook.md',
+		metadata: { characteristics: ['test-driven', 'quality-focused'] }
+	},
+	{
+		id: 'performance-cookbook',
+		name: 'Performance Optimization Cookbook',
+		type: 'cookbook',
+		category: 'optimization',
+		description: 'Performance optimization techniques and patterns',
+		filePath: 'cookbooks/performance.cookbook.md',
+		metadata: { characteristics: ['performance-focused'] }
 	}
 ];
 
@@ -376,12 +364,13 @@ const prompts: CatalogEntry[] = [
 /**
  * All built-in catalog entries shipped with awesome-palette core.
  * Order: language instructions, domain instructions, process instructions,
- *        chat modes, prompts.
+ *        agents, prompts, cookbooks.
  */
 export const defaultCatalogEntries: CatalogEntry[] = [
 	...languageInstructions,
 	...domainInstructions,
 	...processInstructions,
-	...chatModes,
-	...prompts
+	...agents,
+	...prompts,
+	...cookbooks
 ];

@@ -1,14 +1,17 @@
 {
   "name": "awesome-palette-vscode",
   "displayName": "Awesome Copilot Palette",
-  "description": "Browse and install GitHub Copilot instructions, prompts, and chatmodes from awesome-copilot repositories",
-  "version": "0.1.0",
+  "description": "Browse and install GitHub Copilot instructions, prompts, agents, skills, and cookbooks from awesome-copilot repositories",
+  "version": "0.4.1",
   "publisher": "awesome-palette",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": ["Other"],
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:awesome-palette.catalog"
+  ],
   "main": "./dist/extension.js",
   "scripts": {
     "build": "node esbuild.js",
@@ -17,10 +20,8 @@
     "clean": "rm -rf dist",
     "package": "vsce package"
   },
-  "dependencies": {
-    "@awesome-palette/core": "0.1.0"
-  },
   "devDependencies": {
+    "@awesome-palette/core": "0.1.0",
     "@types/vscode": "^1.85.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.7.0"
@@ -31,7 +32,7 @@
         {
           "id": "awesome-palette",
           "title": "Awesome Copilot Palette",
-          "icon": "$(library)"
+          "icon": "$(wand)"
         }
       ]
     },
