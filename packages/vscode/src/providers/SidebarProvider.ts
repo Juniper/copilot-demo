@@ -47,6 +47,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 				case 'refreshCatalog':
 					vscode.commands.executeCommand('awesome-palette.refreshCatalog');
 					break;
+				case 'openFolder':
+					vscode.commands.executeCommand('vscode.openFolder');
+					break;
 			}
 		});
 	}
@@ -68,7 +71,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
 		const stats = await this._catalogManager.getEnhancedStatistics(
 			targetDir,
-			this._fileInstaller
+			this._fileInstaller,
+			workspaceFolder
 		);
 
 		// Format relative time for lastUpdated
@@ -159,6 +163,99 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         button.secondary:hover {
             background-color: var(--vscode-button-secondaryHoverBackground);
         }
+
+        /* Workspace connection status */
+        .workspace-status {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+        .workspace-icon {
+            font-size: 16px;
+            margin-right: 8px;
+            line-height: 1;
+        }
+        .workspace-details {
+            flex: 1;
+        }
+        .workspace-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .workspace-detail-row {
+            display: flex;
+            align-items: center;
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 2px;
+        }
+        .workspace-detail-row .icon {
+            margin-right: 4px;
+            font-size: 12px;
+        }
+        .status-ok {
+            color: var(--vscode-charts-green);
+        }
+        .status-warning {
+            color: var(--vscode-charts-yellow);
+        }
+        .status-error {
+            color: var(--vscode-charts-red);
+        }
+        .workspace-warning {
+            margin-top: 8px;
+            padding: 8px;
+            background-color: var(--vscode-inputValidation-warningBackground);
+            border: 1px solid var(--vscode-inputValidation-warningBorder);
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        /* Rate limit indicator */
+        .rate-limit-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .rate-remaining {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .rate-reset {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            margin-top: 4px;
+        }
+        .rate-bar-container {
+            height: 6px;
+            background-color: var(--vscode-widget-border);
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        .rate-bar-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        .rate-bar-green {
+            background-color: var(--vscode-charts-green);
+        }
+        .rate-bar-yellow {
+            background-color: var(--vscode-charts-yellow);
+        }
+        .rate-bar-red {
+            background-color: var(--vscode-charts-red);
+        }
+        .rate-token-message {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            margin-top: 8px;
+            padding: 6px;
+            background-color: var(--vscode-textBlockQuote-background);
+            border-radius: 3px;
+        }
+
         .footer {
             margin-top: 16px;
             font-size: 11px;
@@ -209,12 +306,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 <span class="stat-value">${stats.skills.total}</span>
             </div>
             <div class="source-breakdown">${stats.skills.local} local + ${stats.skills.remote} remote</div>
-
-            <div class="stat-row" style="margin-top: 4px;">
-                <span class="stat-label">Cookbooks:</span>
-                <span class="stat-value">${stats.cookbooks.total}</span>
-            </div>
-            <div class="source-breakdown">${stats.cookbooks.local} local + ${stats.cookbooks.remote} remote</div>
         </div>
     </div>
 
@@ -240,14 +331,85 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 <span class="stat-value">${stats.installation.byType.agents}</span>
             </div>
             <div class="stat-row">
-                <span class="stat-label">├─ Skills:</span>
+                <span class="stat-label">└─ Skills:</span>
                 <span class="stat-value">${stats.installation.byType.skills}</span>
             </div>
-            <div class="stat-row">
-                <span class="stat-label">└─ Cookbooks:</span>
-                <span class="stat-value">${stats.installation.byType.cookbooks}</span>
+        </div>
+    </div>
+    ` : ''}
+
+    ${stats.workspace ? `
+    <!-- Item M: Workspace Connection Status -->
+    <div class="section">
+        <div class="section-title">Workspace Connection</div>
+        ${stats.workspace.isOpen ? `
+            <div class="workspace-status">
+                <div class="workspace-icon">${stats.workspace.hasWritePermission ? '✓' : '⚠'}</div>
+                <div class="workspace-details">
+                    <div class="workspace-name">${stats.workspace.folderName}</div>
+                    <div class="workspace-detail-row">
+                        <span class="icon ${stats.workspace.hasGithubDirectory ? 'status-ok' : 'status-warning'}">●</span>
+                        <span>.github/ ${stats.workspace.hasGithubDirectory ? 'exists' : 'not created yet'}</span>
+                    </div>
+                    <div class="workspace-detail-row">
+                        <span class="icon ${stats.workspace.hasWritePermission ? 'status-ok' : 'status-error'}">●</span>
+                        <span>Write ${stats.workspace.hasWritePermission ? 'enabled' : 'denied'}</span>
+                    </div>
+                    ${!stats.workspace.hasGithubDirectory ? `
+                        <div style="margin-top: 4px; font-size: 10px; color: var(--vscode-descriptionForeground);">
+                            Target: ${stats.workspace.targetPath}
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+            ${stats.workspace.permissionError ? `
+                <div class="workspace-warning">
+                    Permission error: ${stats.workspace.permissionError}
+                </div>
+            ` : ''}
+        ` : `
+            <div class="workspace-warning">
+                ⚠️ No workspace folder is open. Files cannot be installed without an open workspace.
+                <button onclick="openFolder()" style="margin-top: 8px; width: 100%;">Open Folder</button>
+            </div>
+        `}
+    </div>
+    ` : ''}
+
+    ${stats.rateLimit ? `
+    <!-- Item R: API Rate Limit Indicator -->
+    <div class="section">
+        <div class="section-title">GitHub API Rate Limit</div>
+        <div class="rate-limit-header">
+            <div>
+                <div class="rate-remaining status-${stats.rateLimit.color}">
+                    ${stats.rateLimit.remaining}
+                </div>
+                <div style="font-size: 11px; color: var(--vscode-descriptionForeground);">
+                    of ${stats.rateLimit.limit} remaining
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <div class="rate-reset">
+                    Resets in<br>${stats.rateLimit.minutesUntilReset} min
+                </div>
             </div>
         </div>
+        <div class="rate-bar-container">
+            <div class="rate-bar-fill rate-bar-${stats.rateLimit.color}"
+                 style="width: ${Math.round((stats.rateLimit.remaining / stats.rateLimit.limit) * 100)}%">
+            </div>
+        </div>
+        ${!stats.rateLimit.hasToken ? `
+            <div class="rate-token-message">
+                💡 <strong>Tip:</strong> Add a GitHub token in settings for higher limits (5000/hour).
+            </div>
+        ` : ''}
+        ${stats.rateLimit.repositories.length > 0 ? `
+            <div style="font-size: 10px; color: var(--vscode-descriptionForeground); margin-top: 8px;">
+                Tracking: ${stats.rateLimit.repositories.join(', ')}
+            </div>
+        ` : ''}
     </div>
     ` : ''}
 
@@ -270,6 +432,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
         function refreshCatalog() {
             vscode.postMessage({ type: 'refreshCatalog' });
+        }
+
+        function openFolder() {
+            vscode.postMessage({ type: 'openFolder' });
         }
     </script>
 </body>

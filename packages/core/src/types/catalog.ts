@@ -45,6 +45,12 @@ export interface EnhancedStatistics {
 
 	// Installation status (optional, requires workspace context)
 	installation?: InstallationStatistics;
+
+	// Workspace connection status (P3 - Item M)
+	workspace?: WorkspaceStatus;
+
+	// API rate limit indicator (P3 - Item R)
+	rateLimit?: RateLimitStatus;
 }
 
 /** Statistics for a single file type */
@@ -172,4 +178,26 @@ export interface CacheMetrics {
 	lastHit?: Date;
 	lastMiss?: Date;
 	lastInvalidation?: Date;
+}
+
+/** Workspace connection status (Item M) */
+export interface WorkspaceStatus {
+	isOpen: boolean;
+	folderName?: string;
+	folderPath?: string;
+	hasGithubDirectory: boolean;
+	targetPath?: string;
+	hasWritePermission: boolean;
+	permissionError?: string;
+}
+
+/** API rate limit status (Item R) */
+export interface RateLimitStatus {
+	remaining: number;
+	limit: number;
+	resetTime: Date;
+	minutesUntilReset: number;
+	color: 'green' | 'yellow' | 'red';
+	hasToken: boolean;
+	repositories: string[];
 }

@@ -380,7 +380,11 @@ export class RepositoryManager {
 
 			this._logger.debug(`Response ${response.status} in ${responseTime}ms (rate limit: ${rateLimit.remaining}/${rateLimit.limit})`);
 
-			repository.rateLimit = { remaining: rateLimit.remaining, resetTime: rateLimit.resetTime };
+			repository.rateLimit = {
+				limit: rateLimit.limit,
+				remaining: rateLimit.remaining,
+				resetTime: rateLimit.resetTime
+			};
 
 			if (!response.ok) {
 				const errorText = await response.text();

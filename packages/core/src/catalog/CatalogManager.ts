@@ -7,6 +7,7 @@
  * RepositoryManager).
  */
 
+import * as path from 'path';
 import type { Logger } from '../interfaces/Logger.js';
 import type { PaletteConfig } from '../interfaces/Config.js';
 import type {
@@ -400,10 +401,12 @@ ${enhancedCatalog.combined.prompts.map(p => `- ${p}`).join('\n')}
 	 *
 	 * @param targetDir Optional workspace directory for installation status checks
 	 * @param fileInstaller Optional FileInstaller instance for status checks
+	 * @param workspaceFolder Optional workspace folder for workspace status checks
 	 */
 	async getEnhancedStatistics(
 		targetDir?: string,
-		fileInstaller?: any // Avoid circular dependency
+		fileInstaller?: any, // Avoid circular dependency
+		workspaceFolder?: any
 	): Promise<EnhancedStatistics> {
 		// Get enhanced catalog (includes remote data)
 		const enhanced = await this.getEnhancedCatalog();
@@ -458,7 +461,9 @@ ${enhancedCatalog.combined.prompts.map(p => `- ${p}`).join('\n')}
 				type: entry.type,
 				path: entry.filePath,  // Map filePath to path
 				description: entry.description,
-				source: 'Bundled' as const
+				source: 'Bundled' as const,
+				// Mark folder-based types (skills and cookbooks) as folders
+				isFolder: entry.type === 'skill' || entry.type === 'cookbook'
 			}));
 
 			const filesWithStatus = await fileInstaller.getInstallationStatus(
@@ -483,7 +488,140 @@ ${enhancedCatalog.combined.prompts.map(p => `- ${p}`).join('\n')}
 			};
 		}
 
+		// Add workspace status
+		if (workspaceFolder !== undefined) {
+			stats.workspace = await this._getWorkspaceStatus(
+				workspaceFolder,
+				targetDir,
+				fileInstaller
+			);
+		}
+
+		// Add rate limit status
+		stats.rateLimit = this._getRateLimitStatus();
+
 		return stats;
+	}
+
+	/**
+	 * Get workspace connection status.
+	 * @private
+	 */
+	private async _getWorkspaceStatus(
+		workspaceFolder: any,
+		targetDir: string | undefined,
+		fileInstaller: any
+	): Promise<import('../types/catalog.js').WorkspaceStatus> {
+		// No workspace folder
+		if (!workspaceFolder) {
+			return {
+				isOpen: false,
+				hasGithubDirectory: false,
+				hasWritePermission: false
+			};
+		}
+
+		const folderPath = workspaceFolder.uri?.fsPath || workspaceFolder;
+		const folderName = workspaceFolder.name || path.basename(folderPath);
+		const githubPath = path.join(folderPath, '.github');
+
+		// Check if .github exists
+		let hasGithubDirectory = false;
+		if (targetDir && fileInstaller) {
+			try {
+				hasGithubDirectory = await fileInstaller.fileSystem.exists(githubPath);
+			} catch (error) {
+				hasGithubDirectory = false;
+			}
+		}
+
+		// Check write permissions
+		let hasWritePermission = false;
+		let permissionError: string | undefined;
+
+		if (targetDir && fileInstaller) {
+			try {
+				await fileInstaller.fileSystem.mkdir(githubPath, { recursive: true });
+				hasWritePermission = true;
+			} catch (error) {
+				permissionError = error instanceof Error ? error.message : 'Unknown error';
+				hasWritePermission = false;
+			}
+		}
+
+		return {
+			isOpen: true,
+			folderName,
+			folderPath,
+			hasGithubDirectory,
+			targetPath: githubPath,
+			hasWritePermission,
+			permissionError
+		};
+	}
+
+	/**
+	 * Get API rate limit status from repositories.
+	 * @private
+	 */
+	private _getRateLimitStatus(): import('../types/catalog.js').RateLimitStatus | undefined {
+		const repositories = this._repositoryManager.getRepositories();
+
+		// Find the most restrictive rate limit
+		let minRemaining = Infinity;
+		let maxLimit = 60;
+		let earliestResetTime = new Date(Date.now() + 60 * 60 * 1000);
+		const repoNames: string[] = [];
+
+		for (const repo of repositories) {
+			if (repo.rateLimit) {
+				if (repo.rateLimit.remaining < minRemaining) {
+					minRemaining = repo.rateLimit.remaining;
+				}
+				if (repo.rateLimit.limit > maxLimit) {
+					maxLimit = repo.rateLimit.limit;
+				}
+				if (repo.rateLimit.resetTime < earliestResetTime) {
+					earliestResetTime = repo.rateLimit.resetTime;
+				}
+				repoNames.push(repo.name);
+			}
+		}
+
+		// No rate limit data available
+		if (minRemaining === Infinity) {
+			return undefined;
+		}
+
+		// Calculate minutes until reset
+		const now = new Date();
+		const minutesUntilReset = Math.max(
+			0,
+			Math.ceil((earliestResetTime.getTime() - now.getTime()) / 1000 / 60)
+		);
+
+		// Determine color
+		let color: 'green' | 'yellow' | 'red';
+		if (minRemaining > 1000) {
+			color = 'green';
+		} else if (minRemaining >= 100) {
+			color = 'yellow';
+		} else {
+			color = 'red';
+		}
+
+		// Detect token (authenticated = 5000 limit)
+		const hasToken = maxLimit >= 5000;
+
+		return {
+			remaining: minRemaining,
+			limit: maxLimit,
+			resetTime: earliestResetTime,
+			minutesUntilReset,
+			color,
+			hasToken,
+			repositories: repoNames
+		};
 	}
 
 	// -----------------------------------------------------------------------

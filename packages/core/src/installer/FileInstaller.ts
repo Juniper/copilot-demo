@@ -37,6 +37,13 @@ export class FileInstaller {
 		this._config = config;
 	}
 
+	/**
+	 * Expose the FileSystem instance for external use (e.g., permission checks).
+	 */
+	public get fileSystem(): FileSystem {
+		return this._fileSystem;
+	}
+
 	// ── Public API ─────────────────────────────────────────────────────
 
 	/**
@@ -362,8 +369,8 @@ export class FileInstaller {
 		targetPath: string,
 	): Promise<InstallationStatus> {
 		try {
-			// Handle folder-based installations (e.g., skills)
-			if (file.isFolder && file.files) {
+			// Handle folder-based installations (e.g., skills, cookbooks)
+			if (file.isFolder) {
 				return this._checkFolderStatus(file, targetPath);
 			}
 
@@ -392,19 +399,25 @@ export class FileInstaller {
 		targetPath: string,
 	): Promise<InstallationStatus> {
 		try {
-			// For folders, targetPath should be the folder directory
-			const folderPath = path.join(path.dirname(targetPath), '..', 'skills', file.name);
+			// Determine folder directory based on file type
+			const folderType = file.type === 'skill' ? 'skills' : file.type === 'cookbook' ? 'cookbooks' : file.type + 's';
+			const folderPath = path.join(path.dirname(targetPath), '..', folderType, file.name);
 			const folderExists = await this._directoryExists(folderPath);
 
 			if (!folderExists) {
 				return 'available';
 			}
 
+			// If no child files to check, just verify folder exists
+			if (!file.files || file.files.length === 0) {
+				return 'installed';
+			}
+
 			// Folder exists - check if files match
 			let matchingFiles = 0;
-			let totalFiles = file.files?.length || 0;
+			let totalFiles = file.files.length;
 
-			for (const childFile of file.files || []) {
+			for (const childFile of file.files) {
 				const targetFilePath = path.join(folderPath, childFile.relativePath);
 				const fileExists = await this._fileExists(targetFilePath);
 

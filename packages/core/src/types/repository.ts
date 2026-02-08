@@ -28,6 +28,7 @@ export interface OnlineRepository {
 	enabled: boolean;
 	/** API rate limit considerations */
 	rateLimit?: {
+		limit: number;
 		remaining: number;
 		resetTime: Date;
 	};
