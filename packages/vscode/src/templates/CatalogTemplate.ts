@@ -547,6 +547,9 @@ export class CatalogTemplate extends BaseTemplate {
             function updateFileStatus(fileName, newStatus) {
                 const row = document.querySelector(\`tr[data-name="\${fileName.toLowerCase()}"]\`);
                 if (row) {
+                    // Update data-status attribute for filter compatibility
+                    row.dataset.status = newStatus;
+
                     const statusBadge = row.querySelector('.status-badge');
                     const installButton = row.querySelector('.install-button');
 
@@ -727,7 +730,8 @@ export class CatalogTemplate extends BaseTemplate {
 		return `
             <tr data-name="${this.escapeHtml(item.name.toLowerCase())}"
                 data-type="${this.escapeHtml(item.type)}"
-                data-source="${this.escapeHtml(item.source.toLowerCase())}">
+                data-source="${this.escapeHtml(item.source.toLowerCase())}"
+                data-status="${this.escapeHtml(item.status)}">
                 <td>
                     <input type="checkbox" class="file-checkbox" data-file='${this.escapeHtml(JSON.stringify(item))}' />
                 </td>
