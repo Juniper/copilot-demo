@@ -6,6 +6,18 @@ A VS Code extension and CLI for browsing, managing, and installing curated GitHu
 
 Awesome Copilot Palette provides a catalog of reusable Copilot customization files — instruction files (`.instructions.md`), prompt files (`.prompt.md`), and agent modes (`.agent.md`) — that can be installed into any workspace. It ships with a curated set of bundled assets and can fetch additional files from remote GitHub repositories (e.g., [HPE-EMU/awesome-copilot](https://github.com/HPE-EMU/awesome-copilot)).
 
+## Installation
+
+### Quick Install from GitHub Releases
+
+1. Go to the [Releases page](https://github.com/abhishek-dwaraki_hpeprod/awesome-palette/releases)
+2. Download the latest `awesome-palette-vscode-*.vsix` file
+3. Open VS Code → Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`)
+4. Click "..." menu → "Install from VSIX..." → Select downloaded file
+5. Reload VS Code
+
+For detailed installation instructions, troubleshooting, and alternative methods, see [INSTALL.md](./INSTALL.md).
+
 ## Features
 
 - **Catalog Browser** — Browse all available instructions, prompts, and agents from a sidebar panel or full catalog view
