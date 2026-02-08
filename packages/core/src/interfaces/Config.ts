@@ -3,7 +3,7 @@
  */
 
 export interface RepositoryConfig {
-	/** Repository owner (e.g. "HPE-EMU" or "github") */
+	/** Repository owner (e.g. "github" or "another-organization") */
 	owner: string;
 	/** Repository name (e.g. "awesome-copilot") */
 	repo: string;
@@ -40,7 +40,7 @@ export function createDefaultConfig(overrides?: Partial<PaletteConfig>): Palette
 	return {
 		remoteRepositories: [
 			{
-				owner: 'HPE-EMU',
+				owner: 'github',
 				repo: 'awesome-copilot',
 				branch: 'main',
 				enabled: true

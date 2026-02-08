@@ -71,7 +71,7 @@
           "type": "array",
           "default": [
             {
-              "owner": "HPE-EMU",
+              "owner": "github",
               "repo": "awesome-copilot",
               "branch": "main",
               "enabled": true

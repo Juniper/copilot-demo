@@ -4,7 +4,7 @@ A VS Code extension and CLI for browsing, managing, and installing curated GitHu
 
 ## Overview
 
-Awesome Copilot Palette provides a catalog of reusable Copilot customization files — instruction files (`.instructions.md`), prompt files (`.prompt.md`), and agent modes (`.agent.md`) — that can be installed into any workspace. It ships with a curated set of bundled assets and can fetch additional files from remote GitHub repositories (e.g., [HPE-EMU/awesome-copilot](https://github.com/HPE-EMU/awesome-copilot)).
+Awesome Copilot Palette provides a catalog of reusable Copilot customization files — instruction files (`.instructions.md`), prompt files (`.prompt.md`), and agent modes (`.agent.md`) — that can be installed into any workspace. It ships with a curated set of bundled assets and can fetch additional files from remote GitHub repositories (e.g., [github/awesome-copilot](https://github.com/github/awesome-copilot)).
 
 ## Installation
 
@@ -97,7 +97,7 @@ The extension exposes the following settings under `awesome-palette.*`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `remoteRepositories` | `[{owner: "HPE-EMU", repo: "awesome-copilot", branch: "main", enabled: true}]` | GitHub repositories to fetch files from |
+| `remoteRepositories` | `[{owner: "github", repo: "awesome-copilot", branch: "main", enabled: true}]` | GitHub repositories to fetch files from |
 | `enableOnlineFetching` | `true` | Enable/disable fetching from remote repositories |
 | `githubToken` | `""` | GitHub PAT for higher API rate limits (optional) |
 | `cache.enabled` | `true` | Enable catalog caching |
@@ -116,4 +116,4 @@ The extension ships with a curated set of files covering:
 
 ## License
 
-HPE Internal Use Only (do not clone outside of the HPE-EMU for now).
+HPE Internal Use Only.

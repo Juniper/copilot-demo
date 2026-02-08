@@ -61,7 +61,7 @@ The extension can be configured via VS Code settings. Search for "Awesome Palett
 {
   "awesome-palette.remoteRepositories": [
     {
-      "owner": "HPE-EMU",
+      "owner": "github",
       "repo": "awesome-copilot",
       "branch": "main",
       "enabled": true

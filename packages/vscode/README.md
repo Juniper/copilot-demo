@@ -4,7 +4,7 @@ Browse and install GitHub Copilot instructions, prompts, agents, skills, and coo
 
 ## Overview
 
-Awesome Copilot Palette provides a curated catalog of GitHub Copilot customization files. Install reusable instruction files (`.instructions.md`), prompt files (`.prompt.md`), and agent modes (`.agent.md`) into your workspace's `.github/` directory with one click. The extension ships with bundled assets and can fetch additional files from remote GitHub repositories like [HPE-EMU/awesome-copilot](https://github.com/HPE-EMU/awesome-copilot).
+Awesome Copilot Palette provides a curated catalog of GitHub Copilot customization files. Install reusable instruction files (`.instructions.md`), prompt files (`.prompt.md`), and agent modes (`.agent.md`) into your workspace's `.github/` directory with one click. The extension ships with bundled assets and can fetch additional files from remote GitHub repositories like [github/awesome-copilot](https://github.com/github/awesome-copilot).
 
 ## Features
 
@@ -29,7 +29,7 @@ Configure the extension via VS Code settings (search for "Awesome Palette"):
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `remoteRepositories` | HPE-EMU/awesome-copilot | GitHub repositories to fetch files from |
+| `remoteRepositories` | github/awesome-copilot | GitHub repositories to fetch files from |
 | `enableOnlineFetching` | true | Enable/disable fetching from remote repositories |
 | `githubToken` | (empty) | GitHub PAT for higher API rate limits (optional) |
 | `cache.enabled` | true | Enable catalog caching |

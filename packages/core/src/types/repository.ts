@@ -8,7 +8,7 @@ export interface OnlineRepository {
 	name: string;
 	/** Full GitHub URL */
 	url: string;
-	/** Repository owner (e.g., 'HPE-EMU') */
+	/** Repository owner (e.g., 'github') */
 	owner: string;
 	/** Repository name (e.g., 'awesome-copilot') */
 	repo: string;

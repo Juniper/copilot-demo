@@ -15,7 +15,7 @@ export class VSCodeConfig {
 
 		const remoteRepositories = config.get<RepositoryConfig[]>('remoteRepositories', [
 			{
-				owner: 'HPE-EMU',
+				owner: 'github',
 				repo: 'awesome-copilot',
 				branch: 'main',
 				enabled: true
