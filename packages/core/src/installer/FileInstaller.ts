@@ -319,7 +319,9 @@ export class FileInstaller {
 
 		// Extract the actual filename from the path instead of using the display name
 		const fileName = path.basename(file.path);
-		return path.join(targetDir, '.github', subdirectory, fileName);
+		// Ensure the filename has the correct type-specific extension
+		const fileNameWithExtension = this._ensureFileExtension(fileName, file.type);
+		return path.join(targetDir, '.github', subdirectory, fileNameWithExtension);
 	}
 
 	/**
