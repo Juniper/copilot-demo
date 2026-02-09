@@ -2,7 +2,7 @@
   "name": "awesome-palette-vscode",
   "displayName": "Awesome Copilot Palette",
   "description": "Browse and install GitHub Copilot instructions, prompts, agents, skills, and cookbooks from awesome-copilot repositories",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "publisher": "awesome-palette",
   "repository": {
     "type": "git",
