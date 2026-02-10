@@ -105,6 +105,12 @@ export class CatalogWebviewProvider implements IWebviewProvider {
 					case 'resolveConflict':
 						await this._handleConflictResolution(messageData.fileData, messageData.resolution);
 						break;
+					case 'previewFile':
+						await this._handlePreviewFile(messageData.fileData);
+						break;
+					case 'openInEditor':
+						await this._handleOpenInEditor(messageData.fileData);
+						break;
 					default:
 						this._logger.warn(`Unknown message type in catalog: ${message.type}`);
 				}
@@ -486,5 +492,98 @@ export class CatalogWebviewProvider implements IWebviewProvider {
 	 */
 	private async _handleConflictResolution(fileData: InstallableFile, resolution: ConflictResolution): Promise<void> {
 		await this._handleInstallFile(fileData, resolution);
+	}
+
+	// ── Preview handlers ──────────────────────────────────────────────
+
+	/**
+	 * Handle preview request: fetch file content and send it back to the webview.
+	 * For skills (folder-based), fetches the SKILL.md marker file.
+	 */
+	private async _handlePreviewFile(fileData: InstallableFile): Promise<void> {
+		try {
+			this._logger.info(`Preview requested for: ${fileData.name}`);
+
+			let content: string;
+
+			if (fileData.isFolder && fileData.files && fileData.files.length > 0) {
+				// Skill: find and fetch the SKILL.md marker file
+				const skillMarker = fileData.files.find(
+					f => f.relativePath.toLowerCase().endsWith('skill.md')
+				);
+
+				if (skillMarker && skillMarker.downloadUrl) {
+					content = await this._fetchUrlContent(skillMarker.downloadUrl);
+				} else {
+					content = `# ${fileData.name}\n\nThis skill does not contain a SKILL.md file.\n\nFiles in this skill:\n${fileData.files.map(f => '- ' + f.relativePath).join('\n')}`;
+				}
+			} else {
+				content = await this._fileInstaller.getFileContent(fileData);
+			}
+
+			if (this._panel) {
+				this._panel.webview.postMessage({
+					type: 'previewContent',
+					fileName: fileData.name,
+					content
+				});
+			}
+		} catch (error) {
+			this._logger.error(`Preview error for ${fileData.name}`, error);
+			if (this._panel) {
+				this._panel.webview.postMessage({
+					type: 'previewError',
+					fileName: fileData.name,
+					error: error instanceof Error ? error.message : String(error)
+				});
+			}
+		}
+	}
+
+	/**
+	 * Handle "Open in Editor": fetch content and open in a VS Code editor tab.
+	 */
+	private async _handleOpenInEditor(fileData: InstallableFile): Promise<void> {
+		try {
+			this._logger.info(`Open in editor requested for: ${fileData.name}`);
+
+			let content: string;
+
+			if (fileData.isFolder && fileData.files && fileData.files.length > 0) {
+				const skillMarker = fileData.files.find(
+					f => f.relativePath.toLowerCase().endsWith('skill.md')
+				);
+				if (skillMarker && skillMarker.downloadUrl) {
+					content = await this._fetchUrlContent(skillMarker.downloadUrl);
+				} else {
+					content = `# ${fileData.name}\n\nNo SKILL.md file found.`;
+				}
+			} else {
+				content = await this._fileInstaller.getFileContent(fileData);
+			}
+
+			const doc = await vscode.workspace.openTextDocument({
+				content,
+				language: 'markdown'
+			});
+			await vscode.window.showTextDocument(doc, { preview: true });
+
+		} catch (error) {
+			this._logger.error(`Open in editor error for ${fileData.name}`, error);
+			vscode.window.showErrorMessage(
+				`Failed to open ${fileData.name} in editor: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	}
+
+	/**
+	 * Fetch raw content from a URL (used for skill marker files).
+	 */
+	private async _fetchUrlContent(url: string): Promise<string> {
+		const response = await fetch(url);
+		if (!response.ok) {
+			throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+		}
+		return response.text();
 	}
 }

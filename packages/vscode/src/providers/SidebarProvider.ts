@@ -4,16 +4,21 @@
  */
 
 import * as vscode from 'vscode';
-import type { CatalogManager, FileInstaller } from '@awesome-palette/core';
+import type { CatalogManager, FileInstaller, PaletteConfig, RepositoryConfig } from '@awesome-palette/core';
+import { VSCodeConfig } from '../adapters/VSCodeConfig';
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
 	private _view?: vscode.WebviewView;
+	private _config: PaletteConfig;
 
 	constructor(
 		private readonly _extensionUri: vscode.Uri,
 		private readonly _catalogManager: CatalogManager,
-		private readonly _fileInstaller: FileInstaller
-	) {}
+		private readonly _fileInstaller: FileInstaller,
+		config: PaletteConfig
+	) {
+		this._config = config;
+	}
 
 	public async resolveWebviewView(
 		webviewView: vscode.WebviewView,
@@ -39,7 +44,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 			console.error('Failed to resolve sidebar view:', error);
 		}
 
-		webviewView.webview.onDidReceiveMessage(message => {
+		webviewView.webview.onDidReceiveMessage(async (message) => {
 			switch (message.type) {
 				case 'openCatalog':
 					vscode.commands.executeCommand('awesome-palette.openCatalog');
@@ -50,6 +55,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 				case 'openFolder':
 					vscode.commands.executeCommand('vscode.openFolder');
 					break;
+				case 'addRepository':
+					await this._handleAddRepository(message);
+					break;
+				case 'removeRepository':
+					await this._handleRemoveRepository(message);
+					break;
+				case 'toggleRepository':
+					await this._handleToggleRepository(message);
+					break;
 			}
 		});
 	}
@@ -58,6 +72,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 	 * Refresh the sidebar content (e.g. after cache clear).
 	 */
 	public async refresh(): Promise<void> {
+		this._config = VSCodeConfig.load();
 		if (this._view) {
 			this._view.webview.html = this._getLoadingHtml();
 			this._view.webview.html = await this._getHtml();
@@ -262,6 +277,168 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             color: var(--vscode-descriptionForeground);
             text-align: center;
         }
+
+        /* Repository Manager Styles */
+        .repo-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .repo-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--vscode-widget-border);
+        }
+        .repo-item:last-child {
+            border-bottom: none;
+        }
+        .repo-item-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
+        }
+        .repo-item-name {
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .repo-item-name.disabled {
+            color: var(--vscode-descriptionForeground);
+            text-decoration: line-through;
+        }
+        .repo-pinned-badge {
+            font-size: 9px;
+            padding: 1px 4px;
+            background-color: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+        .repo-item-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .repo-toggle {
+            position: relative;
+            width: 32px;
+            height: 18px;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 9px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .repo-toggle.on {
+            background-color: var(--vscode-button-background);
+            border-color: var(--vscode-button-background);
+        }
+        .repo-toggle-knob {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 12px;
+            height: 12px;
+            background-color: var(--vscode-foreground);
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+        .repo-toggle.on .repo-toggle-knob {
+            transform: translateX(14px);
+        }
+        .repo-remove-btn {
+            background: none;
+            border: none;
+            color: var(--vscode-descriptionForeground);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 2px 4px;
+            border-radius: 3px;
+            width: auto;
+            margin-bottom: 0;
+        }
+        .repo-remove-btn:hover {
+            color: var(--vscode-errorForeground);
+            background-color: var(--vscode-list-hoverBackground);
+        }
+        .add-repo-toggle {
+            font-size: 11px;
+            color: var(--vscode-textLink-foreground);
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 4px 0;
+            margin-top: 8px;
+            margin-bottom: 0;
+            width: auto;
+            text-align: left;
+        }
+        .add-repo-toggle:hover {
+            color: var(--vscode-textLink-activeForeground);
+            background: none;
+        }
+        .add-repo-form {
+            display: none;
+            margin-top: 8px;
+            padding: 8px;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+        }
+        .add-repo-form.visible {
+            display: block;
+        }
+        .add-repo-form label {
+            display: block;
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 2px;
+            margin-top: 6px;
+        }
+        .add-repo-form label:first-child {
+            margin-top: 0;
+        }
+        .add-repo-form input {
+            width: 100%;
+            padding: 4px 6px;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 3px;
+            font-size: 12px;
+            font-family: var(--vscode-font-family);
+            box-sizing: border-box;
+        }
+        .add-repo-form input:focus {
+            outline: 1px solid var(--vscode-focusBorder);
+        }
+        .add-repo-form-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .add-repo-form-actions button {
+            flex: 1;
+            padding: 4px 8px;
+            font-size: 11px;
+            margin-bottom: 0;
+        }
+        .add-repo-error {
+            font-size: 11px;
+            color: var(--vscode-errorForeground);
+            margin-top: 4px;
+            display: none;
+        }
+        .add-repo-error.visible {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -413,6 +590,28 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     </div>
     ` : ''}
 
+    <!-- Repository Manager -->
+    <div class="section">
+        <div class="section-title">Repositories</div>
+        <ul class="repo-list">
+            ${this._generateRepoListItems()}
+        </ul>
+        <button class="add-repo-toggle" onclick="toggleAddRepoForm()">+ Add Repository</button>
+        <div class="add-repo-form" id="addRepoForm">
+            <label>Owner <span style="color: var(--vscode-errorForeground);">*</span></label>
+            <input type="text" id="repoOwner" placeholder="e.g. microsoft" />
+            <label>Repository <span style="color: var(--vscode-errorForeground);">*</span></label>
+            <input type="text" id="repoName" placeholder="e.g. awesome-copilot" />
+            <label>Branch</label>
+            <input type="text" id="repoBranch" placeholder="main (default)" />
+            <div class="add-repo-error" id="addRepoError"></div>
+            <div class="add-repo-form-actions">
+                <button onclick="addRepository()">Add</button>
+                <button class="secondary" onclick="cancelAddRepo()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <button onclick="openCatalog()">Open Full Catalog</button>
     <button class="secondary" onclick="refreshCatalog()">Refresh Catalog</button>
 
@@ -437,9 +636,194 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         function openFolder() {
             vscode.postMessage({ type: 'openFolder' });
         }
+
+        // Repository management functions
+        function toggleAddRepoForm() {
+            const form = document.getElementById('addRepoForm');
+            if (form) {
+                form.classList.toggle('visible');
+                if (form.classList.contains('visible')) {
+                    document.getElementById('repoOwner')?.focus();
+                }
+            }
+        }
+
+        function cancelAddRepo() {
+            const form = document.getElementById('addRepoForm');
+            if (form) {
+                form.classList.remove('visible');
+            }
+            clearAddRepoForm();
+        }
+
+        function clearAddRepoForm() {
+            const ownerInput = document.getElementById('repoOwner');
+            const nameInput = document.getElementById('repoName');
+            const branchInput = document.getElementById('repoBranch');
+            const errorEl = document.getElementById('addRepoError');
+            if (ownerInput) ownerInput.value = '';
+            if (nameInput) nameInput.value = '';
+            if (branchInput) branchInput.value = '';
+            if (errorEl) {
+                errorEl.textContent = '';
+                errorEl.classList.remove('visible');
+            }
+        }
+
+        function showAddRepoError(message) {
+            const errorEl = document.getElementById('addRepoError');
+            if (errorEl) {
+                errorEl.textContent = message;
+                errorEl.classList.add('visible');
+            }
+        }
+
+        function addRepository() {
+            const owner = (document.getElementById('repoOwner')?.value || '').trim();
+            const repo = (document.getElementById('repoName')?.value || '').trim();
+            const branch = (document.getElementById('repoBranch')?.value || '').trim() || 'main';
+
+            if (!owner) {
+                showAddRepoError('Owner is required.');
+                return;
+            }
+            if (!repo) {
+                showAddRepoError('Repository name is required.');
+                return;
+            }
+            if (!/^[a-zA-Z0-9._-]+$/.test(owner) || !/^[a-zA-Z0-9._-]+$/.test(repo)) {
+                showAddRepoError('Invalid characters in owner or repo name.');
+                return;
+            }
+
+            vscode.postMessage({
+                type: 'addRepository',
+                owner: owner,
+                repo: repo,
+                branch: branch
+            });
+        }
+
+        function toggleRepository(owner, repo) {
+            vscode.postMessage({
+                type: 'toggleRepository',
+                owner: owner,
+                repo: repo
+            });
+        }
+
+        function removeRepository(owner, repo) {
+            vscode.postMessage({
+                type: 'removeRepository',
+                owner: owner,
+                repo: repo
+            });
+        }
     </script>
 </body>
 </html>`;
+	}
+
+	/**
+	 * Check if a repo config matches the default pinned repository.
+	 */
+	private _isDefaultRepo(repo: RepositoryConfig): boolean {
+		return repo.owner === 'github' && repo.repo === 'awesome-copilot';
+	}
+
+	/**
+	 * Escape HTML entities for safe interpolation.
+	 */
+	private _escapeHtml(text: string): string {
+		return text
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;');
+	}
+
+	/**
+	 * Generate the list items for the repository manager section.
+	 */
+	private _generateRepoListItems(): string {
+		const repos = this._config.remoteRepositories;
+		if (repos.length === 0) {
+			return '<li style="font-size: 11px; color: var(--vscode-descriptionForeground); padding: 4px 0;">No repositories configured.</li>';
+		}
+
+		return repos.map(repo => {
+			const isPinned = this._isDefaultRepo(repo);
+			const displayName = `${this._escapeHtml(repo.owner)}/${this._escapeHtml(repo.repo)}`;
+			const nameClass = repo.enabled ? 'repo-item-name' : 'repo-item-name disabled';
+			const toggleClass = repo.enabled ? 'repo-toggle on' : 'repo-toggle';
+			const ownerEscaped = this._escapeHtml(repo.owner);
+			const repoEscaped = this._escapeHtml(repo.repo);
+
+			return `
+                <li class="repo-item">
+                    <div class="repo-item-info">
+                        <span class="${nameClass}" title="${displayName} (${this._escapeHtml(repo.branch)})">${displayName}</span>
+                        ${isPinned ? '<span class="repo-pinned-badge">DEFAULT</span>' : ''}
+                    </div>
+                    <div class="repo-item-actions">
+                        <div class="${toggleClass}" onclick="toggleRepository('${ownerEscaped}', '${repoEscaped}')" title="${repo.enabled ? 'Disable' : 'Enable'} this repository">
+                            <div class="repo-toggle-knob"></div>
+                        </div>
+                        ${!isPinned ? `<button class="repo-remove-btn" onclick="removeRepository('${ownerEscaped}', '${repoEscaped}')" title="Remove repository">&times;</button>` : ''}
+                    </div>
+                </li>`;
+		}).join('');
+	}
+
+	/**
+	 * Handle addRepository message from the webview.
+	 */
+	private async _handleAddRepository(message: { owner: string; repo: string; branch: string }): Promise<void> {
+		const { owner, repo, branch } = message;
+		const repos = [...this._config.remoteRepositories];
+
+		// Check for duplicates
+		const exists = repos.some(r => r.owner === owner && r.repo === repo);
+		if (exists) {
+			vscode.window.showWarningMessage(`Repository ${owner}/${repo} is already configured.`);
+			return;
+		}
+
+		repos.push({ owner, repo, branch: branch || 'main', enabled: true });
+		await VSCodeConfig.updateRepositories(repos);
+	}
+
+	/**
+	 * Handle removeRepository message from the webview.
+	 */
+	private async _handleRemoveRepository(message: { owner: string; repo: string }): Promise<void> {
+		const { owner, repo } = message;
+
+		// Prevent removing the default pinned repo
+		if (owner === 'github' && repo === 'awesome-copilot') {
+			vscode.window.showWarningMessage('The default repository cannot be removed.');
+			return;
+		}
+
+		const repos = this._config.remoteRepositories.filter(
+			r => !(r.owner === owner && r.repo === repo)
+		);
+		await VSCodeConfig.updateRepositories(repos);
+	}
+
+	/**
+	 * Handle toggleRepository message from the webview.
+	 */
+	private async _handleToggleRepository(message: { owner: string; repo: string }): Promise<void> {
+		const { owner, repo } = message;
+		const repos = this._config.remoteRepositories.map(r => {
+			if (r.owner === owner && r.repo === repo) {
+				return { ...r, enabled: !r.enabled };
+			}
+			return r;
+		});
+		await VSCodeConfig.updateRepositories(repos);
 	}
 
 	private _getErrorHtml(errorMessage: string): string {

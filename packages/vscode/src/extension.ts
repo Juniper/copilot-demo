@@ -50,7 +50,8 @@ export function activate(context: vscode.ExtensionContext) {
 	const sidebarProvider = new SidebarProvider(
 		context.extensionUri,
 		catalogManager,
-		fileInstaller
+		fileInstaller,
+		config
 	);
 
 	// Register sidebar webview view

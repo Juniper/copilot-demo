@@ -43,6 +43,7 @@ export class CatalogTemplate extends BaseTemplate {
             ${this._generateSummary(filesWithStatus)}
             ${this._generateCatalogTable(filesWithStatus)}
             ${this._generateNoResultsMessage()}
+            ${this._generatePreviewModal()}
             ${this._generateFooter()}
         `;
 	}
@@ -271,6 +272,162 @@ export class CatalogTemplate extends BaseTemplate {
                 color: var(--vscode-descriptionForeground);
                 font-style: italic;
                 font-size: 12px;
+            }
+
+            /* Preview Button */
+            .preview-button {
+                background: none;
+                border: 1px solid transparent;
+                color: var(--vscode-descriptionForeground);
+                cursor: pointer;
+                padding: 3px 5px;
+                border-radius: 3px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                transition: color 0.15s, border-color 0.15s;
+            }
+            .preview-button:hover {
+                color: var(--vscode-foreground);
+                border-color: var(--vscode-input-border);
+            }
+
+            /* Preview Modal */
+            .preview-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.6);
+                z-index: 1000;
+                justify-content: center;
+                align-items: center;
+            }
+            .preview-overlay.visible {
+                display: flex;
+            }
+            .preview-modal {
+                background-color: var(--vscode-editor-background);
+                border: 1px solid var(--vscode-panel-border);
+                border-radius: 6px;
+                width: 80%;
+                max-width: 800px;
+                max-height: 85vh;
+                display: flex;
+                flex-direction: column;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            }
+            .preview-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 16px;
+                border-bottom: 1px solid var(--vscode-panel-border);
+                flex-shrink: 0;
+            }
+            .preview-header-left {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-width: 0;
+            }
+            .preview-title {
+                font-size: 14px;
+                font-weight: 600;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .preview-header-actions {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex-shrink: 0;
+            }
+            .preview-open-editor {
+                font-size: 11px;
+                padding: 4px 10px;
+            }
+            .preview-close {
+                background: none;
+                border: none;
+                color: var(--vscode-foreground);
+                font-size: 18px;
+                cursor: pointer;
+                padding: 2px 6px;
+                border-radius: 3px;
+                line-height: 1;
+            }
+            .preview-close:hover {
+                background-color: var(--vscode-list-hoverBackground);
+            }
+            .preview-body {
+                padding: 20px 24px;
+                overflow-y: auto;
+                flex: 1;
+                font-size: 13px;
+                line-height: 1.6;
+            }
+            .preview-body pre {
+                background-color: var(--vscode-textCodeBlock-background);
+                padding: 12px;
+                border-radius: 4px;
+                overflow-x: auto;
+                font-family: var(--vscode-editor-font-family);
+                font-size: 12px;
+            }
+            .preview-body code {
+                font-family: var(--vscode-editor-font-family);
+                font-size: 12px;
+            }
+            .preview-body :not(pre) > code {
+                background-color: var(--vscode-textCodeBlock-background);
+                padding: 2px 4px;
+                border-radius: 3px;
+            }
+            .preview-body h1, .preview-body h2, .preview-body h3 {
+                margin-top: 20px;
+                margin-bottom: 8px;
+                border-bottom: 1px solid var(--vscode-panel-border);
+                padding-bottom: 4px;
+            }
+            .preview-body h1 { font-size: 20px; }
+            .preview-body h2 { font-size: 16px; }
+            .preview-body h3 { font-size: 14px; }
+            .preview-body ul, .preview-body ol {
+                padding-left: 24px;
+            }
+            .preview-body blockquote {
+                border-left: 3px solid var(--vscode-textBlockQuote-border);
+                margin: 8px 0;
+                padding: 4px 12px;
+                color: var(--vscode-descriptionForeground);
+            }
+            .preview-body table {
+                border-collapse: collapse;
+                width: 100%;
+                margin: 8px 0;
+            }
+            .preview-body th, .preview-body td {
+                border: 1px solid var(--vscode-panel-border);
+                padding: 6px 10px;
+                text-align: left;
+            }
+            .preview-body th {
+                background-color: var(--vscode-editor-background);
+                font-weight: 600;
+            }
+            .preview-loading {
+                text-align: center;
+                padding: 40px;
+                color: var(--vscode-descriptionForeground);
+            }
+            .preview-error {
+                padding: 20px;
+                color: var(--vscode-errorForeground);
+                text-align: center;
             }
         `;
 	}
@@ -609,8 +766,161 @@ export class CatalogTemplate extends BaseTemplate {
                     case 'installationStatusUpdate':
                         updateAllFileStatuses(message.filesWithStatus);
                         break;
+                    case 'previewContent':
+                        showPreviewContent(message.fileName, message.content);
+                        break;
+                    case 'previewError':
+                        showPreviewError(message.error);
+                        break;
                 }
             });
+
+            // ── Preview modal ────────────────────────────────────────
+
+            let currentPreviewFile = null;
+
+            function openPreview(fileData) {
+                currentPreviewFile = fileData;
+                const overlay = document.getElementById('previewOverlay');
+                const title = document.getElementById('previewTitle');
+                const body = document.getElementById('previewBody');
+
+                if (!overlay || !title || !body) return;
+
+                title.textContent = fileData.name;
+                body.innerHTML = '<div class="preview-loading">Loading preview...</div>';
+                overlay.classList.add('visible');
+
+                sendMessage('previewFile', { fileData: fileData });
+            }
+
+            function closePreview() {
+                const overlay = document.getElementById('previewOverlay');
+                if (overlay) {
+                    overlay.classList.remove('visible');
+                }
+                currentPreviewFile = null;
+            }
+
+            function showPreviewContent(fileName, content) {
+                const body = document.getElementById('previewBody');
+                if (!body) return;
+                body.innerHTML = renderMarkdown(content);
+            }
+
+            function showPreviewError(error) {
+                const body = document.getElementById('previewBody');
+                if (!body) return;
+                body.innerHTML = '<div class="preview-error">Failed to load preview: ' + escapeForHtml(error) + '</div>';
+            }
+
+            function openInEditor() {
+                if (currentPreviewFile) {
+                    sendMessage('openInEditor', { fileData: currentPreviewFile });
+                }
+            }
+
+            // Lightweight markdown-to-HTML renderer
+            function renderMarkdown(md) {
+                if (!md) return '<div class="preview-error">No content available.</div>';
+
+                let html = escapeForHtml(md);
+
+                // Code blocks (fenced) — must happen before inline transforms
+                html = html.replace(/\`\`\`(\\w*)\\n([\\s\\S]*?)\`\`\`/g, function(_, lang, code) {
+                    return '<pre><code>' + code + '</code></pre>';
+                });
+
+                // Inline code
+                html = html.replace(/\`([^\`]+)\`/g, '<code>$1</code>');
+
+                // Headings
+                html = html.replace(/^######\\s+(.+)$/gm, '<h6>$1</h6>');
+                html = html.replace(/^#####\\s+(.+)$/gm, '<h5>$1</h5>');
+                html = html.replace(/^####\\s+(.+)$/gm, '<h4>$1</h4>');
+                html = html.replace(/^###\\s+(.+)$/gm, '<h3>$1</h3>');
+                html = html.replace(/^##\\s+(.+)$/gm, '<h2>$1</h2>');
+                html = html.replace(/^#\\s+(.+)$/gm, '<h1>$1</h1>');
+
+                // Bold & italic
+                html = html.replace(/\\*\\*\\*(.+?)\\*\\*\\*/g, '<strong><em>$1</em></strong>');
+                html = html.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
+                html = html.replace(/\\*(.+?)\\*/g, '<em>$1</em>');
+
+                // Blockquotes
+                html = html.replace(/^&gt;\\s+(.+)$/gm, '<blockquote>$1</blockquote>');
+
+                // Horizontal rules
+                html = html.replace(/^---$/gm, '<hr>');
+
+                // Unordered lists
+                html = html.replace(/^[\\*\\-]\\s+(.+)$/gm, '<li>$1</li>');
+                html = html.replace(/((?:<li>.*<\\/li>\\n?)+)/g, '<ul>$1</ul>');
+
+                // Links
+                html = html.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2">$1</a>');
+
+                // Paragraphs — wrap loose lines
+                html = html.replace(/^(?!<[a-z])(\\S.+)$/gm, '<p>$1</p>');
+
+                // Clean up empty paragraphs
+                html = html.replace(/<p><\\/p>/g, '');
+
+                return html;
+            }
+
+            function escapeForHtml(text) {
+                const div = document.createElement('div');
+                div.appendChild(document.createTextNode(text));
+                return div.innerHTML;
+            }
+
+            // Setup preview event listeners
+            (function setupPreviewListeners() {
+                // Preview button clicks (delegated)
+                document.addEventListener('click', function(e) {
+                    const previewBtn = e.target.closest('.preview-button');
+                    if (previewBtn) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        try {
+                            const fileData = JSON.parse(previewBtn.dataset.file);
+                            openPreview(fileData);
+                        } catch (err) {
+                            console.error('Error opening preview:', err);
+                        }
+                        return;
+                    }
+                });
+
+                // Close button
+                document.addEventListener('click', function(e) {
+                    if (e.target.id === 'previewClose' || e.target.closest('#previewClose')) {
+                        closePreview();
+                    }
+                });
+
+                // Open in editor button
+                document.addEventListener('click', function(e) {
+                    if (e.target.id === 'previewOpenEditor' || e.target.closest('#previewOpenEditor')) {
+                        openInEditor();
+                    }
+                });
+
+                // Click outside modal to close
+                document.addEventListener('click', function(e) {
+                    if (e.target.id === 'previewOverlay') {
+                        closePreview();
+                    }
+                });
+
+                // Escape key to close
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') {
+                        closePreview();
+                    }
+                });
+            })();
         `;
 	}
 
@@ -726,6 +1036,7 @@ export class CatalogTemplate extends BaseTemplate {
 		const statusIcon = this._getStatusIcon(item.status);
 		const statusClass = `status-${item.status}`;
 		const installButton = this._getInstallButton(item);
+		const previewButton = this._getPreviewButton(item);
 
 		return `
             <tr data-name="${this.escapeHtml(item.name.toLowerCase())}"
@@ -735,7 +1046,7 @@ export class CatalogTemplate extends BaseTemplate {
                 <td>
                     <input type="checkbox" class="file-checkbox" data-file='${this.escapeHtml(JSON.stringify(item))}' />
                 </td>
-                <td><strong>${this.escapeHtml(item.name)}</strong></td>
+                <td><strong>${this.escapeHtml(item.name)}</strong> ${previewButton}</td>
                 <td><span class="type-badge type-${this.escapeHtml(item.type)}">${this.escapeHtml(item.type)}</span></td>
                 <td><span class="source-badge source-${this.escapeHtml(item.source.toLowerCase())}">${this.escapeHtml(item.source)}</span></td>
                 <td>
@@ -760,6 +1071,30 @@ export class CatalogTemplate extends BaseTemplate {
             <div class="no-results" id="noResults">
                 <h3>No files match your search criteria</h3>
                 <p>Try adjusting your search terms or clearing filters.</p>
+            </div>
+        `;
+	}
+
+	/**
+	 * Generate preview modal overlay HTML
+	 */
+	private _generatePreviewModal(): string {
+		return `
+            <div class="preview-overlay" id="previewOverlay">
+                <div class="preview-modal">
+                    <div class="preview-header">
+                        <div class="preview-header-left">
+                            <span class="preview-title" id="previewTitle">Preview</span>
+                        </div>
+                        <div class="preview-header-actions">
+                            <button class="preview-open-editor" id="previewOpenEditor" title="Open in VS Code editor">Open in Editor</button>
+                            <button class="preview-close" id="previewClose" title="Close preview">&times;</button>
+                        </div>
+                    </div>
+                    <div class="preview-body" id="previewBody">
+                        <div class="preview-loading">Loading preview...</div>
+                    </div>
+                </div>
             </div>
         `;
 	}
@@ -806,6 +1141,18 @@ export class CatalogTemplate extends BaseTemplate {
 			default:
 				return `<button class="install-button" disabled>Unknown</button>`;
 		}
+	}
+
+	/**
+	 * Get preview button HTML for a file.
+	 */
+	private _getPreviewButton(file: InstallableFileWithStatus): string {
+		const fileDataJson = this.escapeHtml(JSON.stringify(file));
+		return `<button class="preview-button" data-file='${fileDataJson}' title="Preview content">
+			<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+				<path d="M4 1h8l3 3v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zm0 1v12h10V5h-3V2H4zm2 4h6v1H6V6zm0 2h6v1H6V8zm0 2h4v1H6v-1z"/>
+			</svg>
+		</button>`;
 	}
 
 	/**

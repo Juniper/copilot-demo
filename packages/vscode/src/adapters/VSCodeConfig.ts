@@ -56,4 +56,12 @@ export class VSCodeConfig {
 			}
 		});
 	}
+
+	/**
+	 * Update the remote repositories list in VS Code settings (global scope).
+	 */
+	static async updateRepositories(repos: RepositoryConfig[]): Promise<void> {
+		const config = vscode.workspace.getConfiguration(SECTION);
+		await config.update('remoteRepositories', repos, vscode.ConfigurationTarget.Global);
+	}
 }

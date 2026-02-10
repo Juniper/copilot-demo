@@ -47,6 +47,13 @@ export class FileInstaller {
 	// ── Public API ─────────────────────────────────────────────────────
 
 	/**
+	 * Retrieve the raw content of a file (bundled asset or online fetch).
+	 */
+	async getFileContent(file: InstallableFile): Promise<string> {
+		return this._getFileContent(file);
+	}
+
+	/**
 	 * Get installation status for a collection of files.
 	 *
 	 * @param files      The files to check.
