@@ -6,7 +6,7 @@
  */
 
 import type { Logger } from '../interfaces/Logger.js';
-import type { PaletteConfig } from '../interfaces/Config.js';
+import type { PaletteConfig, PathOverrides } from '../interfaces/Config.js';
 import type {
 	OnlineRepository,
 	RemoteFile,
@@ -16,6 +16,14 @@ import type {
 	RepositoryManagerConfig
 } from '../types/repository.js';
 import type { EnhancedCatalog } from '../types/catalog.js';
+import type {
+	StructureAnalysisResult,
+	DiscoveredFile,
+	DiscoveredSkill,
+	DiscoveredSkillFile
+} from '../types/analyzer.js';
+import { StructureAnalyzer } from '../analyzer/StructureAnalyzer.js';
+import { classifyFile, DEFAULT_EXCLUDED_DIRECTORIES } from '../analyzer/FileTypeRules.js';
 
 export class RepositoryManager {
 	private _logger: Logger;
@@ -24,6 +32,7 @@ export class RepositoryManager {
 	private indexes: Map<string, RepositoryIndex> = new Map();
 	private fileCache: Map<string, CachedFile> = new Map();
 	private config: RepositoryManagerConfig;
+	private _structureAnalyzer: StructureAnalyzer;
 
 	constructor(logger: Logger, paletteConfig: PaletteConfig) {
 		this._logger = logger;
@@ -35,8 +44,39 @@ export class RepositoryManager {
 			maxFileSize: 1024 * 1024,
 			requestTimeout: 10000,
 			userAgent: 'awesome-palette/1.0',
-			githubToken: paletteConfig.githubToken
+			githubToken: paletteConfig.githubToken,
+			maxScanDepth: 3,
+			excludedDirectories: DEFAULT_EXCLUDED_DIRECTORIES as string[]
 		};
+
+		// Instantiate StructureAnalyzer with adapted makeGitHubApiRequest
+		// Wrapper to match GitHubApiRequestFn signature
+		const apiRequestAdapter = async (
+			url: string,
+			repository: { owner: string; repo: string; branch?: string }
+		) => {
+			// Create a minimal OnlineRepository object for the API call
+			const tempRepo: OnlineRepository = {
+				name: `${repository.owner}/${repository.repo}`,
+				url: `https://github.com/${repository.owner}/${repository.repo}`,
+				owner: repository.owner,
+				repo: repository.repo,
+				branch: repository.branch,
+				enabled: true
+			};
+			
+			const result = await this.makeGitHubApiRequest(url, tempRepo);
+			return {
+				success: result.success,
+				data: result.data,
+				error: result.error
+			};
+		};
+
+		this._structureAnalyzer = new StructureAnalyzer(
+			this._logger,
+			apiRequestAdapter
+		);
 
 		this.initializeDefaultRepositories();
 		this._logger.info('RepositoryManager initialized');
@@ -49,19 +89,35 @@ export class RepositoryManager {
 				continue;
 			}
 
+			// Check if this is the default github/awesome-copilot repo (FR-012: backward compatibility)
+			const isDefaultRepo = repoConfig.owner === 'github' && repoConfig.repo === 'awesome-copilot';
+
 			const repository: OnlineRepository = {
 				name: `${repoConfig.owner}/${repoConfig.repo}`,
 				url: `https://github.com/${repoConfig.owner}/${repoConfig.repo}`,
 				owner: repoConfig.owner,
 				repo: repoConfig.repo,
 				branch: repoConfig.branch || 'main',
-				instructionsPath: 'instructions',
-				promptsPath: 'prompts',
-				agentsPath: 'agents',
-				skillsPath: 'skills',
-				cookbooksPath: 'cookbook',
 				enabled: true
 			};
+
+			// Handle pathOverrides (FR-006, FR-007, FR-008)
+			if (repoConfig.pathOverrides) {
+				// Use pathOverrides if provided
+				repository.instructionsPath = repoConfig.pathOverrides.instructions;
+				repository.promptsPath = repoConfig.pathOverrides.prompts;
+				repository.agentsPath = repoConfig.pathOverrides.agents;
+				repository.skillsPath = repoConfig.pathOverrides.skills;
+				repository.cookbooksPath = repoConfig.pathOverrides.cookbooks;
+			} else if (isDefaultRepo) {
+				// FR-012: Default repo MUST keep hardcoded paths for backward compatibility
+				repository.instructionsPath = 'instructions';
+				repository.promptsPath = 'prompts';
+				repository.agentsPath = 'agents';
+				repository.skillsPath = 'skills';
+				repository.cookbooksPath = 'cookbook';
+			}
+			// Otherwise leave all paths undefined to trigger auto-discovery
 
 			const repoKey = `${repository.owner}/${repository.repo}`;
 			this.repositories.set(repoKey, repository);
@@ -138,42 +194,23 @@ export class RepositoryManager {
 
 		try {
 			const startTime = Date.now();
-			const files: RemoteFile[] = [];
+			
+			// Check if we need to use auto-discovery or path overrides
+			const hasAnyPath = !!(
+				repository.instructionsPath ||
+				repository.promptsPath ||
+				repository.agentsPath ||
+				repository.skillsPath ||
+				repository.cookbooksPath
+			);
 
-			const directories = [
-				{ path: repository.instructionsPath || 'instructions', type: 'instruction' as const },
-				{ path: repository.promptsPath || 'prompts', type: 'prompt' as const },
-				{ path: repository.agentsPath || 'agents', type: 'agent' as const },
-				{ path: repository.skillsPath || 'skills', type: 'skill' as const },
-				{ path: repository.cookbooksPath || 'cookbooks', type: 'cookbook' as const }
-			];
-
-			for (const dir of directories) {
-				const dirFiles = await this.indexDirectory(repository, dir.path, dir.type);
-				files.push(...dirFiles);
-				this._logger.debug(`Found ${dirFiles.length} ${dir.type} files in ${dir.path}/`);
+			if (!hasAnyPath) {
+				// Auto-discovery path: all paths are undefined
+				return await this._indexWithAutoDiscovery(repository, repoKey, startTime);
+			} else {
+				// Override/Hybrid path: at least one path is defined
+				return await this._indexWithPathOverrides(repository, repoKey, startTime);
 			}
-
-			const index: RepositoryIndex = {
-				repository,
-				files,
-				indexedAt: new Date(),
-				ttl: this.config.indexRefreshInterval,
-				isValid: true,
-				stats: {
-					totalFiles: files.length,
-					instructionFiles: files.filter(f => f.type === 'instruction').length,
-					promptFiles: files.filter(f => f.type === 'prompt').length,
-					agentFiles: files.filter(f => f.type === 'agent').length,
-					skillFiles: files.filter(f => f.type === 'skill').length,
-					cookbookFiles: files.filter(f => f.type === 'cookbook').length
-				}
-			};
-
-			this.indexes.set(repoKey, index);
-			const indexTime = Date.now() - startTime;
-			this._logger.info(`Repository indexed in ${indexTime}ms: ${JSON.stringify(index.stats)}`);
-			return index;
 
 		} catch (error) {
 			this._logger.error(`Failed to index repository ${repository.name}`, error);
@@ -186,6 +223,194 @@ export class RepositoryManager {
 			this.indexes.set(repoKey, failedIndex);
 			return failedIndex;
 		}
+	}
+
+	/**
+	 * Index repository using StructureAnalyzer auto-discovery
+	 */
+	private async _indexWithAutoDiscovery(
+		repository: OnlineRepository,
+		repoKey: string,
+		startTime: number
+	): Promise<RepositoryIndex> {
+		this._logger.info(`Using auto-discovery for ${repository.name}`);
+
+		// Run structure analysis
+		const analysisResult = await this._structureAnalyzer.analyze(
+			repository.owner,
+			repository.repo,
+			repository.branch || 'main',
+			{
+				maxScanDepth: this.config.maxScanDepth,
+				excludedDirectories: this.config.excludedDirectories
+			}
+		);
+
+		// Check if repository is usable
+		if (!analysisResult.isUsable) {
+			this._logger.warn(`Repository ${repository.name} has no usable structure`);
+			for (const warning of analysisResult.warnings) {
+				this._logger.warn(`  [${warning.code}] ${warning.message}`);
+			}
+
+			const failedIndex: RepositoryIndex = {
+				repository,
+				files: [],
+				indexedAt: new Date(),
+				ttl: this.config.indexRefreshInterval,
+				isValid: false,
+				stats: { totalFiles: 0, instructionFiles: 0, promptFiles: 0, agentFiles: 0, skillFiles: 0, cookbookFiles: 0 },
+				structureAnalysis: analysisResult
+			};
+			this.indexes.set(repoKey, failedIndex);
+			return failedIndex;
+		}
+
+		// Convert discovered files to RemoteFiles
+		const files: RemoteFile[] = [];
+		
+		// Convert regular discovered files
+		files.push(...this._convertDiscoveredFilesToRemoteFiles(
+			analysisResult.discoveredFiles,
+			repository
+		));
+
+		// Convert skill directories
+		files.push(...this._convertDiscoveredSkillsToRemoteFiles(
+			analysisResult.discoveredSkills,
+			repository
+		));
+
+		const index: RepositoryIndex = {
+			repository,
+			files,
+			indexedAt: new Date(),
+			ttl: this.config.indexRefreshInterval,
+			isValid: true,
+			stats: {
+				totalFiles: files.length,
+				instructionFiles: files.filter(f => f.type === 'instruction').length,
+				promptFiles: files.filter(f => f.type === 'prompt').length,
+				agentFiles: files.filter(f => f.type === 'agent').length,
+				skillFiles: files.filter(f => f.type === 'skill').length,
+				cookbookFiles: files.filter(f => f.type === 'cookbook').length
+			},
+			structureAnalysis: analysisResult
+		};
+
+		this.indexes.set(repoKey, index);
+		const indexTime = Date.now() - startTime;
+		this._logger.info(`Repository auto-discovered in ${indexTime}ms: ${JSON.stringify(index.stats)}`);
+		return index;
+	}
+
+	/**
+	 * Index repository using path overrides (legacy/hybrid mode)
+	 */
+	private async _indexWithPathOverrides(
+		repository: OnlineRepository,
+		repoKey: string,
+		startTime: number
+	): Promise<RepositoryIndex> {
+		this._logger.info(`Using path overrides for ${repository.name}`);
+
+		const files: RemoteFile[] = [];
+
+		const directories = [
+			{ path: repository.instructionsPath, type: 'instruction' as const },
+			{ path: repository.promptsPath, type: 'prompt' as const },
+			{ path: repository.agentsPath, type: 'agent' as const },
+			{ path: repository.skillsPath, type: 'skill' as const },
+			{ path: repository.cookbooksPath, type: 'cookbook' as const }
+		];
+
+		for (const dir of directories) {
+			if (!dir.path) {
+				// Path not defined - skip this type (could implement hybrid discovery here)
+				this._logger.debug(`No path defined for ${dir.type}, skipping`);
+				continue;
+			}
+
+			const dirFiles = await this.indexDirectory(repository, dir.path, dir.type);
+			files.push(...dirFiles);
+			this._logger.debug(`Found ${dirFiles.length} ${dir.type} files in ${dir.path}/`);
+		}
+
+		const index: RepositoryIndex = {
+			repository,
+			files,
+			indexedAt: new Date(),
+			ttl: this.config.indexRefreshInterval,
+			isValid: true,
+			stats: {
+				totalFiles: files.length,
+				instructionFiles: files.filter(f => f.type === 'instruction').length,
+				promptFiles: files.filter(f => f.type === 'prompt').length,
+				agentFiles: files.filter(f => f.type === 'agent').length,
+				skillFiles: files.filter(f => f.type === 'skill').length,
+				cookbookFiles: files.filter(f => f.type === 'cookbook').length
+			}
+		};
+
+		this.indexes.set(repoKey, index);
+		const indexTime = Date.now() - startTime;
+		this._logger.info(`Repository indexed in ${indexTime}ms: ${JSON.stringify(index.stats)}`);
+		return index;
+	}
+
+	/**
+	 * Convert DiscoveredFile[] to RemoteFile[]
+	 */
+	private _convertDiscoveredFilesToRemoteFiles(
+		files: DiscoveredFile[],
+		repository: OnlineRepository
+	): RemoteFile[] {
+		return files.map(file => {
+			const downloadUrl = `https://raw.githubusercontent.com/${repository.owner}/${repository.repo}/${repository.branch || 'main'}/${file.path}`;
+			
+			return {
+				name: file.name,
+				path: file.path,
+				type: file.type === 'copilot-instruction' ? 'instruction' : file.type,
+				sha: file.sha,
+				size: file.size,
+				downloadUrl,
+				repository,
+				lastIndexed: new Date(),
+				isFolder: false
+			};
+		});
+	}
+
+	/**
+	 * Convert DiscoveredSkill[] to RemoteFile[]
+	 */
+	private _convertDiscoveredSkillsToRemoteFiles(
+		skills: DiscoveredSkill[],
+		repository: OnlineRepository
+	): RemoteFile[] {
+		return skills.map(skill => {
+			const branch = repository.branch || 'main';
+			
+			return {
+				name: skill.name,
+				path: skill.directoryPath,
+				type: 'skill',
+				sha: '', // Folders don't have SHA
+				size: skill.totalSize,
+				downloadUrl: '', // Folders don't have download URL
+				repository,
+				lastIndexed: new Date(),
+				isFolder: true,
+				files: skill.files.map(file => ({
+					relativePath: file.relativePath,
+					fullPath: file.fullPath,
+					sha: file.sha,
+					size: file.size,
+					downloadUrl: `https://raw.githubusercontent.com/${repository.owner}/${repository.repo}/${branch}/${file.fullPath}`
+				}))
+			};
+		});
 	}
 
 	private async indexDirectory(
@@ -333,21 +558,15 @@ export class RepositoryManager {
 	}
 
 	private isValidFileForType(fileName: string, fileType: 'instruction' | 'prompt' | 'agent' | 'skill' | 'cookbook'): boolean {
-		const lowerName = fileName.toLowerCase();
-		switch (fileType) {
-			case 'instruction':
-				return lowerName.endsWith('.instructions.md') || lowerName.endsWith('.instruction.md');
-			case 'prompt':
-				return lowerName.endsWith('.prompt.md');
-			case 'agent':
-				return lowerName.endsWith('.agent.md');
-			case 'skill':
-				return lowerName === 'skill.md' || lowerName.endsWith('.skill.md');
-			case 'cookbook':
-				return lowerName.endsWith('.cookbook.md');
-			default:
-				return false;
+		// Use the centralized classifyFile function for consistency
+		const classifiedType = classifyFile(fileName);
+		
+		// Handle special case: copilot-instruction maps to instruction
+		if (fileType === 'instruction' && classifiedType === 'copilot-instruction') {
+			return true;
 		}
+		
+		return classifiedType === fileType;
 	}
 
 	private async makeGitHubApiRequest(url: string, repository: OnlineRepository): Promise<GitHubApiResponse> {

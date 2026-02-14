@@ -35,3 +35,19 @@ export type {
 	InstallableFileWithStatus,
 	InstallationResult
 } from './installer.js';
+
+export type {
+	FileType,
+	FileTypeRule,
+	DiscoveredFile,
+	DiscoveredSkill,
+	DiscoveredSkillFile,
+	DirectoryMapping,
+	AnalysisWarningCode,
+	AnalysisWarning,
+	AnalysisStatistics,
+	StructureAnalysisResult,
+	AnalyzerConfig,
+	GitHubApiRequestFn,
+	IStructureAnalyzer
+} from './analyzer.js';
