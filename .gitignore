@@ -8,3 +8,8 @@ out/
 .DS_Store
 *.tgz
 planning-docs/
+
+# Ignore .github contents except workflows and actions
+.github/*
+!.github/workflows/
+!.github/actions/
