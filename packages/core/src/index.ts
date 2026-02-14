@@ -10,12 +10,13 @@
 export type { Logger } from './interfaces/Logger.js';
 export type { FileSystem } from './interfaces/FileSystem.js';
 export { createDefaultConfig } from './interfaces/Config.js';
-export type { PaletteConfig, RepositoryConfig } from './interfaces/Config.js';
+export type { PaletteConfig, RepositoryConfig, PathOverrides } from './interfaces/Config.js';
 
 // ── Core classes ──────────────────────────────────────────────────────
 export { CatalogManager } from './catalog/CatalogManager.js';
 export { RepositoryManager } from './repository/RepositoryManager.js';
 export { FileInstaller } from './installer/FileInstaller.js';
+export { StructureAnalyzer } from './analyzer/StructureAnalyzer.js';
 
 // ── Default implementations ───────────────────────────────────────────
 export { ConsoleLogger } from './defaults/ConsoleLogger.js';
@@ -23,6 +24,9 @@ export { NodeFileSystem } from './defaults/NodeFileSystem.js';
 
 // ── Catalog entries ───────────────────────────────────────────────────
 export { defaultCatalogEntries } from './catalog/entries.js';
+
+// ── Analyzer utilities ────────────────────────────────────────────────
+export { classifyFile, DEFAULT_FILE_TYPE_RULES } from './analyzer/FileTypeRules.js';
 
 // ── Types ─────────────────────────────────────────────────────────────
 export type {
@@ -53,6 +57,22 @@ export type {
 } from './types/installer.js';
 
 export { ConflictResolution } from './types/installer.js';
+
+export type {
+	FileType,
+	FileTypeRule,
+	DiscoveredFile,
+	DiscoveredSkill,
+	DiscoveredSkillFile,
+	DirectoryMapping,
+	AnalysisWarningCode,
+	AnalysisWarning,
+	AnalysisStatistics,
+	StructureAnalysisResult,
+	AnalyzerConfig,
+	GitHubApiRequestFn,
+	IStructureAnalyzer
+} from './types/analyzer.js';
 
 // ── Asset path resolver ───────────────────────────────────────────────
 import * as path from 'path';

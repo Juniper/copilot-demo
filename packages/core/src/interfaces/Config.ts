@@ -2,6 +2,20 @@
  * PaletteConfig — platform-agnostic replacement for vscode.workspace.getConfiguration()
  */
 
+/** Per-type directory path overrides */
+export interface PathOverrides {
+	/** Override directory for instruction files */
+	instructions?: string;
+	/** Override directory for prompt files */
+	prompts?: string;
+	/** Override directory for agent files */
+	agents?: string;
+	/** Override directory for skill directories */
+	skills?: string;
+	/** Override directory for cookbook files */
+	cookbooks?: string;
+}
+
 export interface RepositoryConfig {
 	/** Repository owner (e.g. "github" or "another-organization") */
 	owner: string;
@@ -11,6 +25,16 @@ export interface RepositoryConfig {
 	branch: string;
 	/** Whether this repository is enabled */
 	enabled: boolean;
+	/**
+	 * Optional per-type directory path overrides.
+	 *
+	 * When provided, the system scans ONLY the specified directories
+	 * for the given types (FR-006/FR-007). Types not listed fall back
+	 * to automatic discovery (FR-008).
+	 *
+	 * Naming convention filtering still applies within overridden paths.
+	 */
+	pathOverrides?: PathOverrides;
 }
 
 export interface PaletteConfig {

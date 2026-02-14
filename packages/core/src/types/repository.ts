@@ -3,6 +3,8 @@
  * Types for Online Repository Management
  */
 
+import type { StructureAnalysisResult } from './analyzer.js';
+
 export interface OnlineRepository {
 	/** Display name for the repository */
 	name: string;
@@ -104,6 +106,8 @@ export interface RepositoryIndex {
 		skillFiles: number;
 		cookbookFiles: number;
 	};
+	/** Optional structure analysis result */
+	structureAnalysis?: StructureAnalysisResult;
 }
 
 export interface GitHubApiResponse {
@@ -142,4 +146,8 @@ export interface RepositoryManagerConfig {
 	userAgent: string;
 	/** GitHub personal access token (optional) */
 	githubToken?: string;
+	/** Maximum directory nesting depth to scan (default: 3) */
+	maxScanDepth: number;
+	/** Directory prefixes to skip during scanning */
+	excludedDirectories: string[];
 }
