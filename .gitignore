@@ -8,6 +8,13 @@ out/
 .DS_Store
 *.tgz
 planning-docs/
+.specify/
+todos.db
+.vscode/
+docs/*.excalidraw
+.tmp-sidebar-stash/
+RIGHTMOST-MATCHING-EXAMPLE.md
+demo-rightmost-matching.md
 
 # Ignore .github contents except workflows and actions
 .github/*
