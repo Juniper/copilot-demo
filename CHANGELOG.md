@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-02-24
+
 ### Added
 - **[T001]** Created comprehensive analyzer type definitions in `packages/core/src/types/analyzer.ts`
   - `FileType` union type with 6 file types: `instruction`, `prompt`, `agent`, `skill`, `cookbook`, `copilot-instruction`
@@ -151,6 +153,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Existing repositories without pathOverrides continue working as before
     - All existing functionality preserved (downloadFileContent, getEnhancedCatalog, etc.)
   - TypeScript compilation successful with no errors
+- **[file-watcher-sync]** Added `refreshInstallationStatus()` public method to `CatalogWebviewProvider` (`packages/vscode/src/providers/CatalogWebviewProvider.ts`)
+  - Pushes an `installationStatusUpdate` message to the catalog panel webview with fresh installation statuses
+  - Self-sources the file list via `_collectCatalogData()` — no arguments required, making it callable from external contexts
+  - No-op if the panel is not open (FR-006): guards `this._panel` before and after the async work
+  - Double-checks `this._panel` after `_collectCatalogData()` to handle race condition where panel is disposed during async work
+  - Wraps in try/catch; logs warning via `this._logger.warn()` on failure (e.g., network error during cache refresh)
+- **[file-watcher-sync]** Registered `FileSystemWatcher` for `.github/**` in `packages/vscode/src/extension.ts`
+  - Watches for file creation, modification, and deletion under any `.github/` directory in the workspace
+  - Uses a 500 ms trailing-edge debounce to coalesce rapid successive file events (e.g., bulk installs/deletes)
+  - Debounced handler calls `catalogProvider.refreshInstallationStatus()` and `sidebarProvider.refresh()` in sequence
+  - Watcher registered unconditionally in `activate()` and pushed to `context.subscriptions` for automatic disposal on extension deactivation (FR-005, FR-008)
+  - Satisfies US1 (deletion detection) and US2 (creation/modification detection)
 - **[T008]** Updated public API exports in `packages/core/src/index.ts` to expose new analyzer functionality
   - **Value exports (classes, functions, constants):**
     - `StructureAnalyzer` class from `./analyzer/StructureAnalyzer.js`
@@ -181,7 +195,11 @@ _(No deprecations)_
 _(No removals)_
 
 ### Fixed
-_(No fixes)_
+- **[file-watcher-sync]** Fixed "Refresh Catalog" command (`awesome-palette.refreshCatalog`) to also refresh installation status in the catalog panel when it is open (`packages/vscode/src/extension.ts`)
+  - Previously the command cleared the cache and refreshed the sidebar only; the catalog panel was left stale
+  - Now calls `await catalogProvider.refreshInstallationStatus()` as a third step after `sidebarProvider.refresh()`
+  - If the catalog panel is not open the call is a no-op — no forced panel open (FR-004)
+  - Satisfies US3
 
 ### Security
 _(No security updates)_
