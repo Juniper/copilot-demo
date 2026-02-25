@@ -701,30 +701,45 @@ export class CatalogTemplate extends BaseTemplate {
             }
 
             // Handle status updates from extension
-            function updateFileStatus(fileName, newStatus) {
+            function updateFileStatus(fileName, newStatus, fileData) {
                 const row = document.querySelector(\`tr[data-name="\${fileName.toLowerCase()}"]\`);
                 if (row) {
                     // Update data-status attribute for filter compatibility
                     row.dataset.status = newStatus;
 
                     const statusBadge = row.querySelector('.status-badge');
-                    const installButton = row.querySelector('.install-button');
-
                     if (statusBadge) {
                         statusBadge.className = \`status-badge status-\${newStatus}\`;
                         statusBadge.textContent = getStatusIcon(newStatus) + ' ' + newStatus;
                     }
 
-                    if (installButton && newStatus === 'installed') {
-                        installButton.textContent = 'Installed';
-                        installButton.disabled = true;
-                        installButton.className = 'install-button installed';
+                    const installButton = row.querySelector('.install-button');
+                    if (installButton) {
+                        if (newStatus === 'installed') {
+                            installButton.textContent = 'Installed';
+                            installButton.disabled = true;
+                            installButton.className = 'install-button installed';
+                            installButton.removeAttribute('data-file');
+                        } else if (newStatus === 'available' && fileData) {
+                            installButton.textContent = 'Install';
+                            installButton.disabled = false;
+                            installButton.className = 'install-button';
+                            installButton.dataset.file = JSON.stringify(fileData);
+                        } else if (newStatus === 'conflict' && fileData) {
+                            installButton.textContent = 'Resolve';
+                            installButton.disabled = false;
+                            installButton.className = 'install-button conflict';
+                            installButton.dataset.file = JSON.stringify(fileData);
+                        }
                     }
                 }
             }
 
             function updateAllFileStatuses(filesWithStatus) {
                 allFiles = filesWithStatus;
+                filesWithStatus.forEach(function(file) {
+                    updateFileStatus(file.name, file.status, file);
+                });
                 performSearch();
             }
 

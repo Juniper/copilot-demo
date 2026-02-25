@@ -143,6 +143,27 @@ export class CatalogWebviewProvider implements IWebviewProvider {
 	}
 
 	/**
+	 * Refresh installation status badges in the catalog panel.
+	 * No-op if the panel is not open (FR-006).
+	 */
+	public async refreshInstallationStatus(): Promise<void> {
+		if (!this._panel) { return; }
+		try {
+			const catalogData = await this._collectCatalogData();
+			const targetDir = this._getTargetDir();
+			if (!targetDir) { return; }
+			const filesWithStatus = await this._fileInstaller.getInstallationStatus(catalogData, targetDir);
+			if (!this._panel) { return; } // Re-check: panel may have closed during async work
+			this._panel.webview.postMessage({
+				type: 'installationStatusUpdate',
+				filesWithStatus
+			});
+		} catch (error) {
+			this._logger.warn(`Failed to refresh installation status: ${error}`);
+		}
+	}
+
+	/**
 	 * Dispose of resources
 	 */
 	public dispose(): void {

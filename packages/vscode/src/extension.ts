@@ -77,9 +77,7 @@ export function activate(context: vscode.ExtensionContext) {
 			// Refresh sidebar (await since it's now async)
 			await sidebarProvider.refresh();
 
-			// Only refresh catalog panel if it's already open
-			// Don't force-open it if user just wants to refresh sidebar
-			// The panel will auto-refresh when user opens it next time
+			await catalogProvider.refreshInstallationStatus();
 		})
 	);
 
@@ -91,6 +89,27 @@ export function activate(context: vscode.ExtensionContext) {
 			await sidebarProvider.refresh();
 		})
 	);
+
+	// Watch .github/** for file changes and auto-refresh installation status
+	let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+	const debouncedRefresh = () => {
+		if (debounceTimer) { clearTimeout(debounceTimer); }
+		debounceTimer = setTimeout(async () => {
+			await catalogProvider.refreshInstallationStatus();
+			await sidebarProvider.refresh();
+		}, 500);
+	};
+	// Use RelativePattern per workspace folder — more reliable than an absolute glob
+	// string for in-workspace watching (VS Code v1.80+ recommendation).
+	for (const folder of vscode.workspace.workspaceFolders ?? []) {
+		const watcher = vscode.workspace.createFileSystemWatcher(
+			new vscode.RelativePattern(folder, '.github/**')
+		);
+		watcher.onDidCreate(debouncedRefresh);
+		watcher.onDidChange(debouncedRefresh);
+		watcher.onDidDelete(debouncedRefresh);
+		context.subscriptions.push(watcher);
+	}
 
 	// Clean up
 	context.subscriptions.push(outputChannel);
