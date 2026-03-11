@@ -66,7 +66,12 @@ export class CatalogWebviewProvider implements IWebviewProvider {
 				this._panel.title = this._getTitleForFilter(filterType);
 
 				// Update content
-				this._panel.webview.html = await this._getCatalogHtml(filteredData, filter);
+				const reusedHtml = await this._getCatalogHtml(filteredData, filter);
+
+				// Re-check: panel may have been closed during async HTML generation
+				if (!this._panel) { return; }
+
+				this._panel.webview.html = reusedHtml;
 
 				// Reveal the panel (bring to front)
 				this._panel.reveal(vscode.ViewColumn.Beside);
@@ -87,7 +92,14 @@ export class CatalogWebviewProvider implements IWebviewProvider {
 				}
 			);
 
-			this._panel.webview.html = await this._getCatalogHtml(filteredData, filter);
+			// Register lifecycle and message handlers IMMEDIATELY after panel creation,
+			// before any awaits. If the panel is disposed before onDidDispose is registered,
+			// the event fires into a void and this._panel is never cleared — leaving a stale
+			// reference that causes "Webview is disposed" on the next show() call.
+			this._panel.onDidDispose(() => {
+				this._logger.info('Catalog panel disposed');
+				this._panel = undefined;
+			});
 
 			// Handle messages from the catalog webview
 			this._panel.webview.onDidReceiveMessage(async message => {
@@ -116,11 +128,15 @@ export class CatalogWebviewProvider implements IWebviewProvider {
 				}
 			});
 
-			// Handle panel disposal
-			this._panel.onDidDispose(() => {
-				this._logger.info('Catalog panel disposed');
-				this._panel = undefined;
-			});
+			// Show a loading state immediately so the panel isn't blank while HTML generates
+			this._panel.webview.html = this._getLoadingHtml();
+
+			const newHtml = await this._getCatalogHtml(filteredData, filter);
+
+			// Re-check: panel may have been closed during async HTML generation
+			if (!this._panel) { return; }
+
+			this._panel.webview.html = newHtml;
 
 			this._logger.info(`Catalog displayed with ${filteredData.length} files (filtered from ${catalogData.length})`);
 
@@ -314,6 +330,25 @@ export class CatalogWebviewProvider implements IWebviewProvider {
 	}
 
 	// ── HTML generation ───────────────────────────────────────────────
+
+	/**
+	 * Return a minimal loading skeleton shown while catalog HTML is being generated.
+	 */
+	private _getLoadingHtml(): string {
+		return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><style>
+body { display:flex; align-items:center; justify-content:center; height:100vh; margin:0;
+       font-family: var(--vscode-font-family); color: var(--vscode-foreground);
+       background: var(--vscode-editor-background); }
+.spinner { width:24px; height:24px; border:3px solid var(--vscode-focusBorder);
+           border-top-color:transparent; border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+p { margin-left: 12px; }
+</style></head>
+<body><div class="spinner"></div><p>Loading catalog…</p></body>
+</html>`;
+	}
 
 	/**
 	 * Generate HTML for the catalog webview.
